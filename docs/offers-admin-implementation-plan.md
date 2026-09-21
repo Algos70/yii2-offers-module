@@ -444,18 +444,31 @@ yet and PHPStan rejected the forward references):
   - `['!offer_id', 'safe']` is **not** declared — `offer_id` is never mass
     assigned; `saveWithTerms()` sets it.
 - `getOffer(): ActiveQuery` — `hasOne(Offer::class, ['id' => 'offer_id'])`.
-- `isEmpty(): bool` — true when every user-facing attribute is null/'' , used by
-  the controller to skip writing a terms row for an offer with no terms yet.
+- `isEmpty(): bool` — true when every user-facing attribute is null/`''`.
+  Drives the lifecycle of the optional row inside `saveWithTerms()`: an empty
+  terms object is **not written**, and blanking out an existing one **deletes**
+  the row, so `offer_terms` never accumulates all-null noise. After a
+  successful write the relation is repopulated on the offer, so callers do not
+  see a stale value.
 - `attributeLabels()` — "Wagering (x)", "Min deposit", "Max bonus",
   "Max cashout", "Valid for (days)", "Full T&C URL", "Extra note".
 
-**Acceptance:** `common/tests/Unit/Models/OfferTermsTest.php` covers:
-`wagering_multiplier = 500` fails; `valid_days = 0` fails;
-`terms_url = 'javascript:alert(1)'` fails the `url` validator;
-`max_cashout = 50` with `max_bonus = 100` fails; with
-`offerType = 'welcome'` a missing `min_deposit` fails; with
-`offerType = 'no_deposit'` a present `min_deposit` fails; the same model with
-`offerType = 'free_spins'` validates with all-null numerics.
+**Acceptance (as built, 14 cases):** `common/tests/Unit/Models/OfferTermsTest.php`
+covers: `wagering_multiplier` 500 and −1 fail while 200 passes; `valid_days` 0
+and 366 fail; `terms_url = 'javascript:alert(1)'` fails the `url` validator
+while `example.com/terms` is accepted and rewritten to
+`https://example.com/terms` by `defaultScheme`; `max_cashout = 50` under
+`max_bonus = 100` fails; `offerType = 'welcome'` without `min_deposit` fails;
+`offerType = 'no_deposit'` with a `min_deposit` fails; `offerType = 'free_spins'`
+validates with all-null numerics; `isEmpty()` ignores the foreign key and the
+timestamps; both relation directions resolve and offer 3 has `terms === null`;
+`withTerms()` populates the relation on every row; `saveWithTerms()` writes both
+rows, skips an empty terms object, deletes the row when it is blanked out, and
+**rolls the offer back** when the terms insert trips
+`chk-offer_terms-valid_days` (asserted by offer count and a slug lookup).
+Fixtures: `common/fixtures/OfferTermsFixture.php` (`$depends` on
+`OfferFixture`) plus `common/tests/Support/data/offer_terms.php`, which gives
+terms to offers 1 and 2 only — offers 3–5 exercise the optional side.
 Run: `php vendor/bin/codecept run common/tests/Unit`.
 
 **Commit:** `feat(domain): add offer terms model with conditional validation`
@@ -849,6 +862,7 @@ story sections above are kept in sync; this is the short list.
 | 1.4 enums | done | Added `labelFor()` and the schema drift guard beyond the planned assertions. |
 | 1.5 Casino | done | `getOffers()` moved to 1.6 (PHPStan `class.notFound` on the forward reference). |
 | 1.6 Offer + OfferQuery | done | Expiry split into two validators; `notExpired()` binds a PHP timestamp instead of MySQL `NOW()`; `getTerms()`, `withTerms()` and `saveWithTerms()` moved to 1.7. |
+| 1.7 OfferTerms | done | Picked up the three deferred pieces. `saveWithTerms()` grew an explicit lifecycle for the optional row: skip when empty, delete when blanked, repopulate the relation after commit. Rollback proven against the DB check constraint, not a mock. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
