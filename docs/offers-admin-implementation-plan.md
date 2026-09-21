@@ -897,28 +897,42 @@ Epic 4 — Hardening and verification
 
 ### Story 4.1 — security pass
 
-**Files:** review over the Epic 2 output; fixes land in the touched files.
+**Files:** create `backend/tests/Functional/OfferSecurityCest.php`; review over
+the Epic 2 output.
 
-Checklist, each item verified against the diff:
-- no string-interpolated SQL — filters use `andFilterWhere` / bound params, and
-  every sortable column comes from the `Sort::$attributes` whitelist;
-- no `format => 'raw'` on user data; `Html::encode()` on echoed attributes;
-  `terms_note` encoded then `nl2br`; `terms_url` passed through the `url`
-  validator on input and rendered with `Html::a()` (so a `javascript:` payload
-  never reaches an `href`);
-- CSRF: every form is an `ActiveForm` (hidden `_csrf-backend`), every delete is a
-  `data-method="post"` link backed by `VerbFilter`;
-- `AccessControl` on both controllers denies guests every action;
-- mass assignment: `load()`/`loadMultiple()` only fill attributes listed in
-  `rules()`; `offer_terms.offer_id` is never in that set;
-- `findModel()` does a parameterized primary-key lookup and 404s otherwise;
-- the aggregate write is transactional, so a failed terms insert cannot leave an
-  orphan offer.
+Checklist, each item verified by grepping and reading the diff:
+- **no string-interpolated SQL** — `grep` for `createCommand`, `where("`,
+  `andWhere("` across `backend/`, `common/`, `console/` returns nothing; every
+  filter goes through `andFilterWhere` with bound values, every sortable column
+  comes from the `Sort::$attributes` whitelist;
+- **escaping** — the app's only `format => 'raw'` is `terms_note` on
+  `offer/view`, and its value is `nl2br(Html::encode(...))`; no view echoes a
+  model attribute unencoded;
+- **`terms_url`** — blocked on input by the `url` validator. Checked what
+  happens if such a row arrives another way:
+  `Yii::$app->formatter->asUrl('javascript:alert(1)')` renders
+  `href="http://javascript:alert(1)"` — the formatter prefixes unknown schemes,
+  so the anchor is inert. No extra sanitising needed; a test pins it.
+- **CSRF** — every form is an `ActiveForm` (hidden `_csrf-backend`), every
+  delete is a `data-method="post"` link backed by `VerbFilter`;
+- **`AccessControl`** with `roles => ['@']` on `CasinoController`,
+  `OfferController` and the template's `SiteController`;
+- **mass assignment** — `load()` only fills attributes named in `rules()`;
+  `offer_terms.offer_id` is absent from them and set by `saveWithTerms()`;
+- **`findModel()`** does a parameterized primary-key lookup and 404s otherwise;
+- the aggregate write is transactional, so a failed terms insert cannot leave
+  an orphan offer (proven in Story 1.7).
 
-**Acceptance:** `backend/tests/Functional/OfferSecurityCest.php` asserts a guest
-is redirected from `offer/index|create|update|delete`, a POST without a CSRF
-token is rejected (400), and a stored `<script>` payload appears escaped in both
-the grid and the detail page.
+**Acceptance (as built, 10 cases):** `OfferSecurityCest` asserts that all ten
+admin routes redirect a guest to `site/login` and leave the data untouched; a
+POST without a CSRF token returns **400** and writes nothing; a stored
+`<script>` payload is escaped on the detail page, in the offer grid **and** in
+the joined casino-name column; a smuggled `javascript:` URL never becomes an
+`href="javascript:`; `OfferSearch[title]="' OR 1=1 -- "` returns no rows
+instead of everything (bound, not interpolated); `sort=password_hash` is
+ignored rather than reaching `ORDER BY`; `offer_id` is not mass assignable; and
+unknown ids return **404**.
+Run: `php vendor/bin/codecept run backend/tests`.
 
 **Commit:** `test(backend): cover access control and output escaping`
 
@@ -935,11 +949,40 @@ php vendor/bin/codecept run --env php-builtin      # template's 44 tests + new s
 php yii serve --port=8081 --docroot=@backend/web    # manual smoke
 ```
 
-**Acceptance:** all suites green; manual smoke covers create/update/delete of
-both entities, an offer with and without terms, every filter, a sort toggle, and
-page 2 of the offer grid.
+**Result (as run).**
 
-**Commit:** none (verification only); fixes commit under their own story.
+`docker compose up -d` **found a real defect**: the compose file carried
+`command: --default-authentication-plugin=caching_sha2_password`, an option
+**removed in MySQL 8.4**. The container aborted at startup with
+`[ERROR] [MY-000067] unknown variable`. It had never surfaced because the
+running container predated the compose file. Removed — 8.4 uses
+`caching_sha2_password` by default anyway — and the container now reaches
+`healthy`. This is exactly what the clean-run step exists for.
+
+After that, from a wiped database:
+
+| step | result |
+|------|--------|
+| `php yii migrate/fresh` | 5 migrations applied |
+| `php yii seed/admin …` | `Created user #1 "admin".` |
+| `php yii seed/offers` | `5 casinos, 30 offers created.` / 20 terms rows |
+| `php yii_test migrate` | up to date |
+| `php vendor/bin/codecept run --env php-builtin` | **OK (150 tests, 402 assertions)** |
+| `php vendor/bin/phpstan analyse` | no errors |
+| `php vendor/bin/phpcs --standard=phpcs.xml.dist` | clean, 80 files |
+
+**Manual smoke through the admin UI** (`:8081`, logged in as the seeded
+admin): created "Smoke Test Casino" (slug derived, rating 4.4, Active Yes),
+updated its rating to 4.8; created "Smoke Test Offer" against it as a
+`no_deposit` offer with terms (wagering 50, max cashout 100, valid 5 days) and
+confirmed `Min deposit (not set)` — the type-conditional rule holds through the
+real form; updated its status to Draft; deleted the offer and watched
+`offer_terms` drop 21 → 20, then deleted the casino and returned to exactly the
+seeded state (5 casinos, 30 offers, 20 terms). Filters, sorting and page 2 of
+the grid were exercised in Stories 2.4 and 3.1.
+
+**Commit:** none (verification only); the compose fix commits under Story 4.2's
+own change.
 
 ---
 
@@ -1006,6 +1049,8 @@ story sections above are kept in sync; this is the short list.
 | 2.4 offer search | done | Three plan-level corrections: `joinWith()` must sit outside the filter branch (relational sorting is offered with no filter set); `Sort`/`Pagination` read request query params unless `'params' => $params` is passed, so the planned `search(['sort' => ...])` was silently ignored; `DataColumn` has no `sort` property, so the wagering sort key was renamed to match the filter attribute. Query count measured at 4, constant for `pageSize` 20 and 100 — count only `LEVEL_INFO` log records, each query logs three. |
 | 3.1 seed | done | Seeding real data exposed two rule collisions. A lapsed offer cannot be created (past `expires_at` is rejected), so those rows are inserted dateless and backdated with `updateAttributes()`. A `welcome` draft with no terms was rejected by the min-deposit rule, which now also requires `!isEmpty()` — no terms row, nothing to require. Test lives in the common suite: the console app has no Codeception suite here. |
 | 3.2 README | done | Also widened `phpcs.xml.dist` to the directories added since the scaffold; migrations stay excluded (snake_case class names). Passing paths to `phpcs` overrides the ruleset's file list — the README documents the bare invocation. Whole README path re-run from a wiped database: 140 tests, 376 assertions green. |
+| 4.1 security pass | done | Audit found no injection or escaping holes. Checked the one latent risk explicitly: a `javascript:` URL reaching `terms_url` by another route is neutralised by Yii's `url` formatter, which prefixes unknown schemes. 10 assertions added, including bound-parameter and sort-whitelist proofs. |
+| 4.2 verification | done | The clean run earned its keep: `docker compose up -d` recreated the container and MySQL 8.4 aborted on `--default-authentication-plugin`, removed in 8.4. Fixed. Everything else green from a wiped database: 150 tests, 402 assertions, PHPStan and phpcs clean, manual CRUD smoke on both entities with the cascade verified. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
