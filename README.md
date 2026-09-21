@@ -85,7 +85,9 @@ Tests
 php yii_test migrate --interactive=0
 php vendor/bin/codecept build
 php vendor/bin/codecept run --env php-builtin   # 184 tests
-php vendor/bin/phpstan analyse
+# --memory-limit: PHPStan's parallel workers exceed PHP's default 128M on a
+# cold result cache and crash without it.
+php vendor/bin/phpstan analyse --memory-limit=512M
 php vendor/bin/phpcs --standard=phpcs.xml.dist
 ```
 
