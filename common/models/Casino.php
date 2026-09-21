@@ -6,6 +6,7 @@ namespace common\models;
 
 use yii\behaviors\SluggableBehavior;
 use yii\behaviors\TimestampBehavior;
+use yii\db\ActiveQuery;
 use yii\db\ActiveRecord;
 
 /**
@@ -18,6 +19,8 @@ use yii\db\ActiveRecord;
  * @property bool $is_active
  * @property int $created_at
  * @property int $updated_at
+ *
+ * @property-read Offer[] $offers
  */
 class Casino extends ActiveRecord
 {
@@ -77,5 +80,10 @@ class Casino extends ActiveRecord
             'created_at' => 'Created',
             'updated_at' => 'Updated',
         ];
+    }
+
+    public function getOffers(): ActiveQuery
+    {
+        return $this->hasMany(Offer::class, ['casino_id' => 'id']);
     }
 }
