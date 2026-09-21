@@ -78,8 +78,9 @@ final class Sitemap
         // nothing published still has a page — it says so — and leaving it out
         // would hide a live URL from crawlers. Only inactive casinos are
         // omitted, because only they 404.
-        foreach (Casino::find()->where(['is_active' => true])->orderBy(['name' => SORT_ASC])
-            ->each(self::BATCH_SIZE) as $casino) {
+        $activeCasinos = Casino::find()->where(['is_active' => true])->orderBy(['name' => SORT_ASC]);
+
+        foreach ($activeCasinos->each(self::BATCH_SIZE) as $casino) {
             /** @var Casino $casino */
             $urls[] = [
                 'loc' => Url::to((new CasinoPresenter($casino))->url(), true),

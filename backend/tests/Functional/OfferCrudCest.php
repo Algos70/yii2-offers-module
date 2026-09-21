@@ -122,6 +122,41 @@ final class OfferCrudCest
         );
     }
 
+    /**
+     * The jargon fields carry a "?" explaining themselves. Generic fields -
+     * title, slug, status - deliberately do not: a marker on every row teaches
+     * nobody anything.
+     */
+    public function bonusJargonExplainsItselfInTheForm(FunctionalTester $I): void
+    {
+        $this->login($I);
+
+        $I->amOnRoute('/offer/create');
+
+        $source = $I->grabPageSource();
+        $I->assertStringContainsString('How many times the bonus must be staked', $source);
+        $I->assertStringContainsString('The smallest deposit that unlocks the offer', $source);
+        $I->assertStringContainsString('No deposit: a small bonus just for signing up', $source);
+        $I->assertSame(
+            9,
+            substr_count($source, 'class="help-tip"'),
+            'one marker per jargon field, and none on the self-evident ones',
+        );
+    }
+
+    public function theOfferGridExplainsTypeAndWageringWithoutLosingSorting(
+        FunctionalTester $I,
+    ): void {
+        $this->login($I);
+
+        $I->amOnRoute('/offer/index');
+
+        // The marker sits beside the sort link rather than replacing it.
+        $I->seeLink('Type');
+        $I->seeLink('Wagering');
+        $I->assertSame(2, substr_count($I->grabPageSource(), 'class="help-tip"'));
+    }
+
     public function pastExpiryIsRejected(FunctionalTester $I): void
     {
         $this->login($I);

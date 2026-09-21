@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace backend\components;
 
+use common\widgets\HelpTip;
+use yii\data\Sort;
 use yii\db\ActiveRecord;
 use yii\grid\ActionColumn;
 use yii\helpers\Html;
@@ -86,6 +88,28 @@ final class GridHelper
             ],
             'buttonOptions' => [],
         ];
+    }
+
+    /**
+     * Column header carrying a "?" marker, with sorting left intact.
+     *
+     * `DataColumn` builds its own header - a sort link when the attribute is
+     * sortable, a plain label otherwise - and setting `header` replaces the
+     * whole thing. So the sort link is rebuilt here rather than dropped.
+     *
+     * @param Sort|false $sort the data provider's sort, or false when disabled
+     */
+    public static function helpHeader(
+        Sort|false $sort,
+        string $attribute,
+        string $label,
+        string $term,
+    ): string {
+        $header = $sort !== false && $sort->hasAttribute($attribute)
+            ? $sort->link($attribute, ['label' => Html::encode($label)])
+            : Html::encode($label);
+
+        return $header . ' ' . HelpTip::for($term);
     }
 
     /**

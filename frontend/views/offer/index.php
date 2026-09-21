@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use common\enums\OfferType;
 use common\models\Offer;
+use common\widgets\HelpTip;
 use frontend\assets\OfferFilterAsset;
 use frontend\components\OfferPresenter;
 use yii\helpers\Html;
@@ -41,7 +42,7 @@ $typeOptions = ['' => 'All types'] + OfferType::labels();
         'class' => 'd-flex flex-wrap align-items-center gap-2 p-3 mb-4 bg-body-tertiary border rounded-3',
         'data-offer-filter' => true,
     ]) ?>
-        <div class="d-flex flex-wrap gap-1" role="group" aria-label="Filter by offer type">
+        <div class="d-flex flex-wrap align-items-center gap-1" role="group" aria-label="Filter by offer type">
             <?php foreach ($typeOptions as $value => $label): ?>
                 <?php $id = 'type-' . ($value === '' ? 'all' : $value) ?>
                 <?= Html::radio('type', (string) $filter->type === (string) $value, [
@@ -52,6 +53,8 @@ $typeOptions = ['' => 'All types'] + OfferType::labels();
                 ]) ?>
                 <label class="btn btn-filter" for="<?= $id ?>"><?= Html::encode($label) ?></label>
             <?php endforeach ?>
+            <?php // What the three type names actually mean, before anyone filters by one. ?>
+            <?= HelpTip::for('offer_type') ?>
         </div>
 
         <label class="visually-hidden" for="filter-casino">Casino</label>

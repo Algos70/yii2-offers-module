@@ -76,6 +76,12 @@ $typeVariants = [
             [
                 'attribute' => 'type',
                 'format' => 'raw',
+                'header' => GridHelper::helpHeader(
+                    $dataProvider->getSort(),
+                    'type',
+                    'Type',
+                    'offer_type',
+                ),
                 'headerOptions' => ['style' => 'width:9rem'],
                 'value' => static fn (Offer $offer): string => GridHelper::badge(
                     OfferType::labelFor($offer->type),
@@ -105,6 +111,14 @@ $typeVariants = [
             [
                 'attribute' => 'maxWagering',
                 'label' => 'Wagering',
+                // The column shows each offer's wagering; the box below it
+                // filters by a ceiling, so the marker explains the filter.
+                'header' => GridHelper::helpHeader(
+                    $dataProvider->getSort(),
+                    'maxWagering',
+                    'Wagering',
+                    'max_wagering_filter',
+                ),
                 'format' => 'raw',
                 'headerOptions' => ['class' => 'text-end', 'style' => 'width:8rem'],
                 'contentOptions' => ['class' => 'text-end text-nowrap'],

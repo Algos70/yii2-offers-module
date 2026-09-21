@@ -202,27 +202,35 @@ final class OfferPresenter
     /**
      * Same facts as the chips, labelled for the detail page's tiles.
      *
-     * @return list<array{icon: string, label: string, value: string}>
+     * `help` is the {@see \common\widgets\HelpTip} key, so each tile can
+     * explain the piece of jargon it is showing.
+     *
+     * @return list<array{icon: string, label: string, value: string, help: string}>
      */
     public function termTiles(): array
     {
         $labels = [
-            'wagering' => 'Wagering',
-            'min deposit' => 'Min deposit',
-            'max bonus' => 'Max bonus',
-            'max cashout' => 'Max cashout',
-            'days' => 'Valid for',
-            'day' => 'Valid for',
+            'wagering' => ['Wagering', 'wagering'],
+            'min deposit' => ['Min deposit', 'min_deposit'],
+            'max bonus' => ['Max bonus', 'max_bonus'],
+            'max cashout' => ['Max cashout', 'max_cashout'],
+            'days' => ['Valid for', 'valid_days'],
+            'day' => ['Valid for', 'valid_days'],
         ];
 
         return array_map(
-            static fn (array $chip): array => [
-                'icon' => $chip['icon'],
-                'label' => $labels[$chip['label']] ?? ucfirst($chip['label']),
-                'value' => $chip['label'] === 'days' || $chip['label'] === 'day'
-                    ? $chip['value'] . ' ' . $chip['label']
-                    : $chip['value'],
-            ],
+            static function (array $chip) use ($labels): array {
+                [$label, $help] = $labels[$chip['label']] ?? [ucfirst($chip['label']), 'wagering'];
+
+                return [
+                    'icon' => $chip['icon'],
+                    'label' => $label,
+                    'help' => $help,
+                    'value' => $chip['label'] === 'days' || $chip['label'] === 'day'
+                        ? $chip['value'] . ' ' . $chip['label']
+                        : $chip['value'],
+                ];
+            },
             $this->termChips(),
         );
     }

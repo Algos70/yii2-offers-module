@@ -131,6 +131,26 @@ final class OfferCest
     }
 
     /**
+     * A visitor meeting "wagering" for the first time should not have to leave
+     * the page to find out what it costs them.
+     */
+    public function bonusJargonExplainsItselfToVisitors(FunctionalTester $I): void
+    {
+        $I->amOnRoute('/offer/view', ['slug' => 'visible-welcome-bonus']);
+
+        $source = $I->grabPageSource();
+        $I->assertStringContainsString('How many times the bonus must be staked', $source);
+        $I->assertStringContainsString('The smallest deposit that unlocks the offer', $source);
+
+        // Same glossary on the listing, where the type filter is the jargon.
+        $I->amOnRoute('/offer/index');
+        $I->assertStringContainsString(
+            'No deposit: a small bonus just for signing up',
+            $I->grabPageSource(),
+        );
+    }
+
+    /**
      * A draft, an expired offer, one whose date lapsed, one belonging to an
      * inactive casino and a slug that never existed must be indistinguishable.
      */

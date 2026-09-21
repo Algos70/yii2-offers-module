@@ -5,6 +5,7 @@ declare(strict_types=1);
 /** @var yii\web\View $this */
 /** @var frontend\components\OfferPresenter $presenter */
 
+use common\widgets\HelpTip;
 use yii\helpers\Html;
 
 $offer = $presenter->offer();
@@ -82,6 +83,7 @@ $this->title = $offer->title;
                                 <p class="small text-body-secondary mb-1 d-flex align-items-center gap-1">
                                     <i class="<?= $tile['icon'] ?>" aria-hidden="true"></i>
                                     <?= Html::encode($tile['label']) ?>
+                                    <?= HelpTip::for($tile['help']) ?>
                                 </p>
                                 <p class="h4 font-display fw-bold mb-0"><?= Html::encode($tile['value']) ?></p>
                             </div>
