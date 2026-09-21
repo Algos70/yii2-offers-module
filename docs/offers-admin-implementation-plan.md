@@ -554,30 +554,44 @@ Not covered in the browser: the delete link's `data-method="post"` +
 `backend/views/offer/{index,create,update,view,_form}.php`
 
 - `behaviors()` as in Story 2.2.
-- The form edits **two models in one request**, the framework way:
+- The form edits **two models in one request**. The plan originally called for
+  `Model::loadMultiple()`; that is **wrong** and was corrected during
+  implementation. Its source (`yii\base\Model:914-938`) keys on
+  `$data[$formName][$i]`, i.e. it is for *tabular* input — many rows of the
+  **same** model (`Offer[0]`, `Offer[1]`). Two *different* models each get their
+  own `load()`, which already scopes by form name. `validateMultiple()` is fine
+  as planned: it does accept heterogeneous models.
 
 ```php
-public function actionCreate(): Response|string
+private function saveFromRequest(Offer $offer, OfferTerms $terms): bool
 {
-    $offer = new Offer();
-    $terms = new OfferTerms();
+    $post = Yii::$app->request->post();
 
-    if (Model::loadMultiple([$offer, $terms], Yii::$app->request->post())) {
-        $terms->offerType = $offer->type;                 // validation context
-        if (Model::validateMultiple([$offer, $terms]) && $offer->saveWithTerms($terms)) {
-            Yii::$app->session->setFlash('success', 'Offer created.');
-            return $this->redirect(['view', 'id' => $offer->id]);
-        }
+    if (!$offer->load($post)) {       // false on a plain GET
+        return false;
     }
 
-    return $this->render('create', ['offer' => $offer, 'terms' => $terms]);
+    $terms->load($post);
+    $terms->offerType = $offer->type; // validation context for the conditional rules
+
+    if (!Model::validateMultiple([$offer, $terms])) {
+        return false;
+    }
+
+    return $offer->saveWithTerms($terms);
 }
 ```
 
-  `actionUpdate()` is the same shape with
-  `$terms = $offer->terms ?? new OfferTerms()`.
-  `Model::loadMultiple()` keys on form names (`Offer[...]`, `OfferTerms[...]`),
-  so one `ActiveForm` renders both without custom request parsing.
+  Both `actionCreate()` and `actionUpdate()` call it; update passes
+  `$offer->terms ?? new OfferTerms()`. Symptom of the original bug, for the
+  record: the form silently re-rendered **empty** after submit, because
+  `loadMultiple()` returned false and neither model was populated.
+- `actionIndex()` builds a plain `ActiveDataProvider` over
+  `Offer::find()->withCasino()->withTerms()` with `pageSize` 20 and a sort
+  whitelist; Story 2.4 swaps in `OfferSearch` with the filters. This keeps 2.3
+  shippable on its own instead of rendering a view with no data.
+- `findModel()` eager-loads both relations, so the detail page and the update
+  form never lazy-load.
 - `_form.php`: `casino_id` dropdown from
   `Casino::find()->select(['name', 'id'])->orderBy('name')->indexBy('id')->column()`
   (one query, no hydration); `type` / `status` dropdowns from the enum label
@@ -589,23 +603,41 @@ public function actionCreate(): Response|string
   `terms_note` as a 3-row textarea with `maxlength => 500`).
 - `view.php` renders the offer with `DetailView` and the terms as a second
   `DetailView` over the related model, formatted through
-  `Yii::$app->formatter` (`decimal`, `integer`, `url`, `date`); `terms_note`
-  prints as `nl2br(Html::encode($terms->terms_note))` — encode first, then
-  `nl2br`, never `format => 'raw'`. When `$offer->terms === null` the panel
-  shows "No terms recorded".
+  `Yii::$app->formatter` (`decimal`, `integer`, `url`, `datetime`);
+  `terms_note` prints as `nl2br(Html::encode($terms->terms_note))` — encode
+  first, then `nl2br`, since the other order would escape the `<br>` tags it
+  just produced. That single column is the only `format => 'raw'` in the app,
+  and its value is encoded by hand before it gets there. When
+  `$offer->terms === null` the panel shows "No terms recorded for this offer."
 - `index.php` grid columns: `id`, `title`, casino name via
   `['attribute' => 'casino_id', 'value' => 'casino.name']` (eager-loaded in
   Story 2.4), `type` and `status` through the enum labels, `amount`,
   `terms.wagering_multiplier` rendered as `35x` (eager-loaded), `expires_at`,
   `ActionColumn`.
 
-**Acceptance (logged in):** creating an offer with blank slug, no `expires_at`
-and empty terms saves as `draft` with no `offer_terms` row; creating a `welcome`
-offer without `min_deposit` redisplays the form with the conditional error **and
-writes neither table** (transaction); a past `expires_at` shows the future-date
-error; `<script>alert(1)</script>` in `terms_note` renders as visible text on
-`view`; updating an offer that already has terms updates the same row rather
-than inserting.
+**Acceptance (as built, 10 cases):** `backend/tests/Functional/OfferCrudCest.php`
+— a guest hitting `index|create|view|update` lands on `site/login`; the grid
+shows the casino name, the enum **labels** (not raw values) and `35x` from the
+terms relation; create with a blank slug and terms writes both rows and
+defaults to `draft`; create with every terms field empty writes **no**
+`offer_terms` row and the detail page says "No terms recorded"; a `welcome`
+offer without `min_deposit` shows "Min deposit cannot be blank." and writes
+neither table; a past `expires_at` shows "Expiry date must be in the future.";
+update reuses the same terms row (`COUNT(*) = 1` afterwards);
+`<script>alert(1)</script>` stored in `terms_note` is *seen* as text and
+`dontSeeInSource` confirms it never reaches the markup; `delete` over GET
+returns 405; `delete` over POST with the CSRF token removes the offer **and**
+its terms row (FK cascade).
+Run: `php vendor/bin/codecept run backend/tests`.
+
+**Browser smoke (real UI, backend on :8081):** created "Weekend Reload 50%"
+with full terms — detail page shows `Slug weekend-reload-50`, `Type Welcome
+bonus`, `Full T&C URL https://example.com/terms` (the `url` validator's
+`defaultScheme` rewrote the typed `example.com/terms`), and the two-line note
+rendered with its line break; a `no_deposit` offer carrying a `min_deposit`
+was rejected inline with "Min deposit does not apply to a no-deposit offer.";
+the listing row reads `Weekend Reload 50% | Golden Reels | Welcome bonus |
+Active | 50.00 | 35x`.
 
 **Commit:** `feat(backend): add offer CRUD with terms`
 
@@ -892,6 +924,7 @@ story sections above are kept in sync; this is the short list.
 | 1.7 OfferTerms | done | Picked up the three deferred pieces. `saveWithTerms()` grew an explicit lifecycle for the optional row: skip when empty, delete when blanked, repopulate the relation after commit. Rollback proven against the DB check constraint, not a mock. |
 | 2.1 nav + gate | done | Nav only; the 302 gate check belongs to the controllers and moved to 2.2/2.3. Covered by `NavigationCest` (guest vs. signed in). |
 | 2.2 casino CRUD | done | `is_active` default had to be set on the create form, not just in `rules()`. Domain fixtures gained `$dataFile = '@common/tests/Support/data/...'` defaults, because `codecept_data_dir()` resolves per suite and the backend suite could not see `common/`'s data files. CSRF rejection (400) turned into its own assertion rather than a test failure. |
+| 2.3 offer CRUD | done | Plan's `Model::loadMultiple()` was wrong for two different models (it is a tabular-input helper); replaced with one `load()` per model plus `validateMultiple()`. `actionIndex()` ships a plain `ActiveDataProvider` until 2.4 replaces it. `findModel()` eager-loads casino and terms. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
