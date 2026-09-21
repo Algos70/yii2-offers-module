@@ -58,11 +58,19 @@ class Casino extends ActiveRecord
             [['slug'], 'trim'],
             [['slug'], 'string', 'max' => 140],
             [['slug'], 'match', 'pattern' => self::SLUG_PATTERN,
-                'message' => '{attribute} may only contain lowercase letters, digits and single hyphens.'],
-            [['slug'], 'unique'],
+                'message' => '{attribute} may only contain lowercase letters, digits and single '
+                    . 'hyphens, like "neon-palace". Leave it blank to build one from the name.'],
+            [['slug'], 'unique',
+                'message' => 'Another casino already uses the slug "{value}", and the public URL '
+                    . '/casino/{value} must point at one casino only. Leave it blank to have a '
+                    . 'free one generated.'],
 
             [['rating'], 'required'],
-            [['rating'], 'number', 'min' => 0, 'max' => 5],
+            [['rating'], 'number', 'min' => 0, 'max' => 5,
+                'message' => '{attribute} must be a number, like 4.5.',
+                'tooSmall' => '{attribute} cannot be below 0. '
+                    . 'Use 0 for a casino you have not rated yet.',
+                'tooBig' => '{attribute} cannot be above 5 - that is the best score there is.'],
 
             [['is_active'], 'default', 'value' => true],
             [['is_active'], 'boolean'],

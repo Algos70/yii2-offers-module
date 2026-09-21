@@ -98,7 +98,7 @@ final class OfferCrudCest
         $I->fillField('OfferTerms[wagering_multiplier]', '40');
         $I->click('Save');
 
-        $I->see('Min deposit cannot be blank.');
+        $I->see('A welcome bonus that states any terms must also state its minimum deposit.');
         $I->dontSeeRecord(Offer::class, ['title' => 'Incomplete Welcome']);
     }
 
@@ -114,9 +114,9 @@ final class OfferCrudCest
         $this->login($I);
 
         $I->amOnRoute('/offer/update', ['id' => 3]);   // a no-deposit offer
-        $I->dontSee('Min deposit cannot be blank.');   // no server-side error either
+        $I->dontSee('must also state its minimum deposit');  // no server-side error either
         $I->assertStringNotContainsString(
-            'Min deposit cannot be blank.',
+            'minimum deposit',
             $I->grabPageSource(),
             'the client validator must not require a min deposit on every offer',
         );
@@ -134,7 +134,7 @@ final class OfferCrudCest
         $I->fillField('Offer[expires_at]', date('Y-m-d H:i:s', strtotime('-1 day')));
         $I->click('Save');
 
-        $I->see('Expiry date must be in the future.');
+        $I->see('Expires at must be in the future');
         $I->dontSeeRecord(Offer::class, ['title' => 'Stale Offer']);
     }
 

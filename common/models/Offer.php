@@ -61,10 +61,15 @@ class Offer extends ActiveRecord
 
     public function rules(): array
     {
+        // Spelled out in the message so a rejected value names the valid ones.
+        $types = implode(', ', OfferType::labels());
+        $statuses = implode(', ', OfferStatus::labels());
+
         return [
             [['casino_id'], 'required'],
             [['casino_id'], 'integer'],
-            [['casino_id'], 'exist', 'targetClass' => Casino::class, 'targetAttribute' => 'id'],
+            [['casino_id'], 'exist', 'targetClass' => Casino::class, 'targetAttribute' => 'id',
+                'message' => 'That casino no longer exists - pick one from the list.'],
 
             [['title'], 'trim'],
             [['title'], 'required'],
@@ -73,20 +78,31 @@ class Offer extends ActiveRecord
             [['slug'], 'trim'],
             [['slug'], 'string', 'max' => 180],
             [['slug'], 'match', 'pattern' => self::SLUG_PATTERN,
-                'message' => '{attribute} may only contain lowercase letters, digits and single hyphens.'],
-            [['slug'], 'unique'],
+                'message' => '{attribute} may only contain lowercase letters, digits and single '
+                    . 'hyphens, like "neon-palace-welcome". Leave it blank to build one from the title.'],
+            [['slug'], 'unique',
+                'message' => 'Another offer already uses the slug "{value}", and the public URL '
+                    . '/offer/{value} must point at one offer only. Leave it blank to have a free '
+                    . 'one generated.'],
 
             [['type'], 'required'],
-            [['type'], 'in', 'range' => OfferType::values()],
+            [['type'], 'in', 'range' => OfferType::values(),
+                'message' => '{attribute} must be one of: ' . $types . '.'],
 
             [['status'], 'default', 'value' => OfferStatus::Draft->value],
             [['status'], 'required'],
-            [['status'], 'in', 'range' => OfferStatus::values()],
+            [['status'], 'in', 'range' => OfferStatus::values(),
+                'message' => '{attribute} must be one of: ' . $statuses . '.'],
 
             [['amount'], 'required'],
-            [['amount'], 'number', 'min' => 0],
+            [['amount'], 'number', 'min' => 0,
+                'message' => '{attribute} must be a number - the cash value, or the count of '
+                    . 'spins for a free-spins offer.',
+                'tooSmall' => '{attribute} cannot be negative; an offer gives value away.'],
 
-            [['expires_at'], 'datetime', 'format' => self::DATETIME_FORMAT],
+            [['expires_at'], 'datetime', 'format' => self::DATETIME_FORMAT,
+                'message' => '{attribute} must be written as YYYY-MM-DD HH:MM:SS, '
+                    . 'like 2026-12-31 23:59:59. Leave it blank if the offer never expires.'],
             [['expires_at'], 'validateExpiresAtInFuture'],
 
             [['status'], 'validateStatusAgainstExpiry'],
@@ -124,7 +140,13 @@ class Offer extends ActiveRecord
         }
 
         if (strtotime($this->expires_at) <= time()) {
-            $this->addError($attribute, 'Expiry date must be in the future.');
+            $this->addError($attribute, sprintf(
+                '%s must be in the future - %s has already passed (it is now %s). '
+                . 'Leave it blank for an offer that never expires.',
+                $this->getAttributeLabel($attribute),
+                $this->expires_at,
+                date('Y-m-d H:i'),
+            ));
         }
     }
 
@@ -142,7 +164,13 @@ class Offer extends ActiveRecord
         }
 
         if (strtotime($this->expires_at) <= time()) {
-            $this->addError($attribute, 'An expired offer cannot be active.');
+            $this->addError($attribute, sprintf(
+                'This offer expired on %s, so it cannot be "%s" - the public site would never '
+                . 'show it. Push the expiry date forward, or set the status to "%s".',
+                $this->expires_at,
+                OfferStatus::Active->label(),
+                OfferStatus::Expired->label(),
+            ));
         }
     }
 

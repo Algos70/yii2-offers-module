@@ -86,7 +86,7 @@ final class CasinoCrudCest
         $I->fillField('Casino[rating]', '9');
         $I->click('Save');
 
-        $I->see('Rating (0-5) must be no greater than 5');
+        $I->see('Rating (0-5) cannot be above 5');
         $I->dontSeeRecord(Casino::class, ['name' => 'Broken Rating']);
     }
 
