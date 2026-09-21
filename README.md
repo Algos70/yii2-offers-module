@@ -17,10 +17,13 @@ Setup
 composer install
 php init --env=Development --overwrite=All            # generates config/*-local.php
 docker compose up -d                                  # MySQL 8.4, database yii2_offers
-php yii migrate                                       # casino, offer, offer_terms
+php yii migrate --interactive=0                       # casino, offer, offer_terms
 php yii seed/admin admin admin@example.com admin123   # admin account
 php yii seed/offers                                   # 6 casinos, 60 offers
 ```
+
+`--interactive=0` so the whole block can be pasted at once: `migrate` otherwise
+stops to ask for confirmation and reads the next pasted line as the answer.
 
 DB defaults are in `common/config/main-local.php`: `yii2_offers`, user `root`,
 password `root`; tests use `yii2_offers_test`.
@@ -84,7 +87,7 @@ Tests
 ```bash
 php yii_test migrate --interactive=0
 php vendor/bin/codecept build
-php vendor/bin/codecept run --env php-builtin   # 184 tests
+php vendor/bin/codecept run --env php-builtin   # 192 tests
 # --memory-limit: PHPStan's parallel workers exceed PHP's default 128M on a
 # cold result cache and crash without it.
 php vendor/bin/phpstan analyse --memory-limit=512M
