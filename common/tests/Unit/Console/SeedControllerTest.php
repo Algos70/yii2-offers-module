@@ -38,21 +38,28 @@ final class SeedControllerTest extends Unit
         };
     }
 
-    public function testSeedCreatesFiveCasinosAndThirtyOffers(): void
+    public function testSeedCreatesOneBatchOfOffersPerCasino(): void
     {
         $this->controller->actionOffers();
 
-        self::assertSame(5, (int) Casino::find()->count());
-        self::assertSame(30, (int) Offer::find()->count());
+        $casinos = (int) Casino::find()->count();
+
+        // Counted from the command's own definitions rather than hardcoded, so
+        // adding a casino to the seed does not turn into a failing test.
+        self::assertSame(6, $casinos);
+        self::assertSame($casinos * SeedController::OFFERS_PER_CASINO, (int) Offer::find()->count());
     }
 
     public function testSeedIsIdempotent(): void
     {
         $this->controller->actionOffers();
+        $casinos = (int) Casino::find()->count();
+        $offers = (int) Offer::find()->count();
+
         $this->controller->actionOffers();
 
-        self::assertSame(5, (int) Casino::find()->count());
-        self::assertSame(30, (int) Offer::find()->count());
+        self::assertSame($casinos, (int) Casino::find()->count());
+        self::assertSame($offers, (int) Offer::find()->count());
     }
 
     public function testEveryTypeAndStatusIsRepresented(): void
@@ -68,13 +75,18 @@ final class SeedControllerTest extends Unit
         }
     }
 
-    public function testSeedFillsMoreThanOnePageAndLeavesVisibleOffers(): void
+    public function testSeedFillsMoreThanOnePageOnBothSurfaces(): void
     {
         $this->controller->actionOffers();
 
-        // 30 rows at 20 per page is two pages in the admin grid.
-        self::assertGreaterThan(20, (int) Offer::find()->count());
-        self::assertGreaterThanOrEqual(10, (int) Offer::find()->active()->notExpired()->count());
+        // Both grids paginate at 20, so the demo data has to exceed that twice
+        // over: once for the admin list, which shows every offer, and once for
+        // the public list, which only shows visible ones. Otherwise nobody ever
+        // sees a pager.
+        $pageSize = 20;
+
+        self::assertGreaterThan($pageSize, (int) Offer::find()->count());
+        self::assertGreaterThan($pageSize, (int) Offer::find()->publiclyVisible()->count());
     }
 
     public function testLapsedOffersExistForTheExpiryFilters(): void

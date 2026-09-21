@@ -25,7 +25,13 @@ use yii\helpers\Inflector;
 class SeedController extends Controller
 {
     /**
-     * Fills the database with 5 casinos and 30 offers.
+     * Offers generated per casino; see {@see templatesFor()}.
+     */
+    public const OFFERS_PER_CASINO = 10;
+
+    /**
+     * Fills the database with the demo catalogue: one batch of offers per
+     * casino in {@see casinoDefinitions()}.
      *
      * The spread is deliberate: every type and status occurs, wagering values
      * straddle 35 so the "max wagering" filter shows a difference, some offers
@@ -90,17 +96,31 @@ class SeedController extends Controller
     }
 
     /**
-     * @return array{0: list<Casino>, 1: int} the casinos and how many were new
+     * The demo operators: name, rating and whether they are active.
+     *
+     * One of them is inactive on purpose — an inactive casino and its offers
+     * must stay off the public site while remaining editable in the admin.
+     *
+     * @return list<array{0: string, 1: string, 2: bool}>
      */
-    private function seedCasinos(): array
+    private function casinoDefinitions(): array
     {
-        $definitions = [
+        return [
             ['Neon Palace', '4.7', true],
             ['Golden Reels', '4.2', true],
             ['Silver Spin', '3.8', false],
             ['Royal Flush Club', '4.5', true],
             ['Midnight Jackpot', '3.9', true],
+            ['Aurora Bay Casino', '4.4', true],
         ];
+    }
+
+    /**
+     * @return array{0: list<Casino>, 1: int} the casinos and how many were new
+     */
+    private function seedCasinos(): array
+    {
+        $definitions = $this->casinoDefinitions();
 
         $casinos = [];
         $created = 0;
@@ -175,7 +195,8 @@ class SeedController extends Controller
     }
 
     /**
-     * 30 offers: six per casino, every type and status represented.
+     * {@see OFFERS_PER_CASINO} offers per casino, every type and status
+     * represented across the catalogue.
      *
      * @param list<Casino> $casinos
      * @return list<array{0: array<string, mixed>, 1: array<string, mixed>, 2: string|null}>
@@ -201,6 +222,7 @@ class SeedController extends Controller
                         // backdated below; see seedOffers().
                         'expires_at' => match ($expiry) {
                             'never', 'gone' => null,
+                            'urgent' => $at('+4 days'),
                             'soon' => $at('+10 days'),
                             'later' => $at('+6 months'),
                             default => throw new \LogicException("Unknown expiry marker \"$expiry\"."),
@@ -216,7 +238,7 @@ class SeedController extends Controller
     }
 
     /**
-     * Six offers per casino, shaped so each type carries terms that make sense
+     * Ten offers per casino, shaped so each type carries terms that make sense
      * for it: welcome bonuses state a minimum deposit, no-deposit offers must
      * not, free spins get a short validity window.
      *
@@ -294,6 +316,57 @@ class SeedController extends Controller
                 '500.00',
                 OfferStatus::Draft->value,
                 'never',
+                [],
+            ],
+            [
+                // Expiry inside the warning window, so the public card shows
+                // its red "Ends in N days" state.
+                "$casinoName Midweek Reload",
+                OfferType::Welcome->value,
+                '75.00',
+                OfferStatus::Active->value,
+                'urgent',
+                [
+                    'wagering_multiplier' => '30.0',
+                    'min_deposit' => '10.00',
+                    'max_bonus' => '75.00',
+                    'valid_days' => 5,
+                ],
+            ],
+            [
+                "$casinoName Weekend Free Spins",
+                OfferType::FreeSpins->value,
+                '25.00',
+                OfferStatus::Active->value,
+                'never',
+                [
+                    'wagering_multiplier' => '20.0',
+                ],
+            ],
+            [
+                "$casinoName High Roller Welcome",
+                OfferType::Welcome->value,
+                '2000.00',
+                OfferStatus::Active->value,
+                'later',
+                [
+                    'wagering_multiplier' => '40.0',
+                    'min_deposit' => '500.00',
+                    'max_bonus' => '2000.00',
+                    'max_cashout' => '10000.00',
+                    'valid_days' => 60,
+                    'terms_url' => 'https://example.com/terms/high-roller',
+                    'terms_note' => "Table games excluded.\nOne claim per household.",
+                ],
+            ],
+            [
+                // No terms row at all: the card falls back to "No bonus terms
+                // published." and the detail page says the same.
+                "$casinoName Loyalty No Deposit",
+                OfferType::NoDeposit->value,
+                '5.00',
+                OfferStatus::Active->value,
+                'soon',
                 [],
             ],
         ];
