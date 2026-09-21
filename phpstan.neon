@@ -3,6 +3,7 @@ parameters:
 
     paths:
         - backend/assets
+        - backend/components
         - backend/controllers
         - backend/models
         - backend/views
