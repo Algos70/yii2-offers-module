@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace backend\controllers;
 
+use backend\models\OfferSearch;
 use common\models\Offer;
 use common\models\OfferTerms;
 use Yii;
 use yii\base\Model;
-use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
 use yii\filters\VerbFilter;
 use yii\web\Controller;
@@ -45,21 +45,13 @@ class OfferController extends Controller
         ];
     }
 
-    /**
-     * Unfiltered listing; Story 2.4 replaces the provider with `OfferSearch`.
-     */
     public function actionIndex(): string
     {
-        $dataProvider = new ActiveDataProvider([
-            'query' => Offer::find()->withCasino()->withTerms(),
-            'pagination' => ['pageSize' => 20],
-            'sort' => [
-                'attributes' => ['id', 'title', 'type', 'status', 'amount', 'expires_at', 'created_at'],
-                'defaultOrder' => ['created_at' => SORT_DESC],
-            ],
-        ]);
+        $searchModel = new OfferSearch();
+        $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
 
         return $this->render('index', [
+            'searchModel' => $searchModel,
             'dataProvider' => $dataProvider,
         ]);
     }
