@@ -84,13 +84,33 @@ Tests
 ```bash
 php yii_test migrate --interactive=0
 php vendor/bin/codecept build
-php vendor/bin/codecept run --env php-builtin   # 180 tests
+php vendor/bin/codecept run --env php-builtin   # 184 tests
 php vendor/bin/phpstan analyse
 php vendor/bin/phpcs --standard=phpcs.xml.dist
 ```
 
 The acceptance suite needs a web server, which the `php-builtin` environment
 starts itself.
+
+Note on `terms`
+---------------
+
+The brief lists `terms` as one field on `offer`. It is a separate table here,
+`offer_terms`, with `offer_id` as **both** primary key and foreign key — so an
+offer has at most one terms row and it dies with its offer.
+
+The reason is that bonus terms are not prose but a small fixed vocabulary:
+wagering, minimum deposit, maximum bonus, maximum cashout, validity window.
+As typed columns they get `CHECK` constraints and real validation (a welcome
+offer must state a minimum deposit, a no-deposit one must not), the admin can
+filter and sort on "wagering ≤ 35" as an indexed `WHERE`, and the public card
+renders each value with its own icon instead of dumping a paragraph. A single
+text column would have made all of that string handling.
+
+They live in their own table rather than as columns on `offer` because they are
+optional as a group — `saveWithTerms()` writes no row when the admin leaves the
+fields blank and deletes it when they are cleared — and because the listing
+query never reads them, so `offer` stays narrow.
 
 More detail — schema, validation rules and the decisions behind them — is in
 `docs/offers-admin-implementation-plan.md`.
