@@ -419,3 +419,277 @@ a.desc:after {
 [data-bs-theme="dark"] .extension-card:hover {
     box-shadow: 0 0 0 1px var(--bs-border-color), 0 8px 24px rgba(0, 0, 0, .4) !important;
 }
+
+/* =============================================================================
+   offers-theme.css  —  public offers UI
+
+   Appended to frontend/web/css/site.css.
+
+   CUSTOMISATION ROUTE
+   This project has no Sass build — vendor/twbs/bootstrap ships .scss, but
+   nothing compiles it and there is no package.json — so extending
+   $theme-colors is not on the table. Bootstrap 5.3's documented no-build route
+   is its CSS custom properties, and that is what this file uses throughout:
+   real .card, .badge, .btn and .pagination components, restyled only by setting
+   THEIR OWN Bootstrap variables on a scoping class. No Bootstrap rule is
+   overridden, no component is reimplemented.
+
+   Everything else is done with stock utilities in the markup: .stretched-link
+   for the card hit target, .z-2 to lift the button above it, .link-body-emphasis
+   and .link-secondary for link colour, .d-flex and .small for layout.
+
+   Exactly two rules below are hand-written CSS rather than Bootstrap variables.
+   Both are marked, and both are things Bootstrap has no equivalent for.
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   1. Offer type colours
+
+   Declared the way Bootstrap declares its own theme colours: a colour token
+   plus an -rgb companion, so they can be handed to any Bootstrap variable that
+   expects a triplet (focus shadows, rgba grounds).
+
+   Generated from oklch(L C H) with ONE lightness and ONE chroma; hue is the
+   only variable. That is what makes three colours read as one family rather
+   than three unrelated stickers. The light and dark values differ because a
+   colour legible on near-white is not legible on near-black.
+   -------------------------------------------------------------------------- */
+:root {
+    --bs-offer-welcome:       #975a00;
+    --bs-offer-welcome-rgb:   151, 90, 0;
+    --bs-offer-nodeposit:     #008145;
+    --bs-offer-nodeposit-rgb: 0, 129, 69;
+    --bs-offer-freespins:     #7750b1;
+    --bs-offer-freespins-rgb: 119, 80, 177;
+
+    /* Ink that sits ON an accent ground. */
+    --bs-offer-ink: #ffffff;
+
+    /* Display face. Body text uses Bootstrap's own font variable. */
+    --bs-body-font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --offer-font-display: "Archivo", "Public Sans", system-ui, sans-serif;
+}
+
+[data-bs-theme="dark"] {
+    --bs-offer-welcome:       #fcba43;
+    --bs-offer-welcome-rgb:   252, 186, 67;
+    --bs-offer-nodeposit:     #63e4a1;
+    --bs-offer-nodeposit-rgb: 99, 228, 161;
+    --bs-offer-freespins:     #d7b0ff;
+    --bs-offer-freespins-rgb: 215, 176, 255;
+
+    --bs-offer-ink: #111419;
+}
+
+/* One class binds one type. Everything downstream — badge ground, amount
+   colour, star fill, card border on hover, button hover — reads --offer-type,
+   so a fourth OfferType case is one enum entry plus four lines here. */
+.offer--welcome {
+    --offer-type: var(--bs-offer-welcome);
+    --offer-type-rgb: var(--bs-offer-welcome-rgb);
+}
+
+.offer--nodeposit {
+    --offer-type: var(--bs-offer-nodeposit);
+    --offer-type-rgb: var(--bs-offer-nodeposit-rgb);
+}
+
+.offer--freespins {
+    --offer-type: var(--bs-offer-freespins);
+    --offer-type-rgb: var(--bs-offer-freespins-rgb);
+}
+
+/* A single utility, named the way Bootstrap names utilities, so the display
+   face can be composed onto any element: class="display-6 font-display". */
+.font-display { font-family: var(--offer-font-display); }
+
+/* -----------------------------------------------------------------------------
+   2. Card  —  a real .card, only Bootstrap's card variables are set
+   -------------------------------------------------------------------------- */
+.offer-card {
+    --bs-card-border-radius: 0.875rem;
+    --bs-card-inner-border-radius: calc(0.875rem - 1px);
+    --bs-card-spacer-x: 1rem;
+    --bs-card-spacer-y: 1rem;
+    --bs-card-cap-bg: var(--bs-tertiary-bg);
+    --bs-card-cap-padding-y: 0.75rem;
+    --bs-card-cap-padding-x: 1rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.offer-card:hover {
+    --bs-card-border-color: var(--offer-type);
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 1px var(--offer-type), 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .offer-card { transition: none; }
+    .offer-card:hover { transform: none; }
+}
+
+/* -----------------------------------------------------------------------------
+   3. Type badge  —  a real .badge
+
+   Mirrors exactly what Bootstrap's own text-bg helpers do: set the badge's
+   colour variable, set background-color. The only difference is that the ground
+   comes from --offer-type instead of a registered theme colour, because
+   registering one would need the Sass build this project does not have.
+   -------------------------------------------------------------------------- */
+.offer-badge {
+    --bs-badge-color: var(--bs-offer-ink);
+    --bs-badge-font-size: 0.6875rem;
+    --bs-badge-font-weight: 700;
+    --bs-badge-padding-x: 0.5rem;
+    --bs-badge-padding-y: 0.3em;
+    --bs-badge-border-radius: var(--bs-border-radius-sm);
+    background-color: var(--offer-type, var(--bs-secondary-color));
+    font-family: var(--offer-font-display);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+/* -----------------------------------------------------------------------------
+   4. Buttons  —  Bootstrap 5.3's documented custom-button pattern
+
+   A class that sets the button variables and is used alongside .btn. Nothing in
+   .btn itself is touched, so every other button on the site is unaffected and
+   these inherit all of Bootstrap's focus and disabled behaviour.
+   -------------------------------------------------------------------------- */
+
+/* The accent is deliberately NOT the button's resting colour. Accent has one
+   job on these pages — encoding offer type — and a gold button would read as a
+   "welcome bonus" button. So the CTA rests at maximum contrast and picks the
+   type colour up on hover, which is where it earns its keep a second time. */
+.btn-offer {
+    --bs-btn-color: var(--bs-body-bg);
+    --bs-btn-bg: var(--bs-body-color);
+    --bs-btn-border-color: var(--bs-body-color);
+    --bs-btn-hover-color: var(--bs-offer-ink);
+    --bs-btn-hover-bg: var(--offer-type, var(--bs-body-color));
+    --bs-btn-hover-border-color: var(--offer-type, var(--bs-body-color));
+    --bs-btn-active-color: var(--bs-offer-ink);
+    --bs-btn-active-bg: var(--offer-type, var(--bs-body-color));
+    --bs-btn-active-border-color: var(--offer-type, var(--bs-body-color));
+    --bs-btn-focus-shadow-rgb: var(--offer-type-rgb, var(--bs-emphasis-color-rgb));
+    --bs-btn-font-size: 0.8125rem;
+    --bs-btn-font-weight: 700;
+    --bs-btn-padding-y: 0.625rem;
+    --bs-btn-padding-x: 1rem;
+    font-family: var(--offer-font-display);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Filter pills: .btn-check plus .btn, which is Bootstrap's own radio-toggle
+   pattern. The checked state comes from the active variables, which is exactly
+   what Bootstrap's checked selector already reads. */
+.btn-filter {
+    --bs-btn-color: var(--bs-body-color);
+    --bs-btn-bg: transparent;
+    --bs-btn-border-color: var(--bs-border-color);
+    --bs-btn-hover-color: var(--bs-body-color);
+    --bs-btn-hover-bg: var(--bs-tertiary-bg);
+    --bs-btn-hover-border-color: var(--bs-body-color);
+    --bs-btn-active-color: var(--bs-body-bg);
+    --bs-btn-active-bg: var(--bs-body-color);
+    --bs-btn-active-border-color: var(--bs-body-color);
+    --bs-btn-focus-shadow-rgb: var(--bs-emphasis-color-rgb);
+    --bs-btn-font-size: 0.8125rem;
+    --bs-btn-font-weight: 600;
+    --bs-btn-padding-y: 0.5rem;
+    --bs-btn-padding-x: 0.8rem;
+    font-family: var(--offer-font-display);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* -----------------------------------------------------------------------------
+   5. Pagination  —  a real .pagination, Bootstrap's pagination variables
+   Bootstrap's default active state is primary blue, which is the one colour on
+   the page that belongs to no offer type. Neutralised here.
+   -------------------------------------------------------------------------- */
+.pagination-offer {
+    --bs-pagination-color: var(--bs-body-color);
+    --bs-pagination-hover-color: var(--bs-body-color);
+    --bs-pagination-hover-bg: var(--bs-tertiary-bg);
+    --bs-pagination-focus-color: var(--bs-body-color);
+    --bs-pagination-focus-bg: var(--bs-tertiary-bg);
+    --bs-pagination-active-color: var(--bs-body-bg);
+    --bs-pagination-active-bg: var(--bs-body-color);
+    --bs-pagination-active-border-color: var(--bs-body-color);
+    --bs-pagination-border-color: var(--bs-border-color);
+}
+
+/* -----------------------------------------------------------------------------
+   6. The two things Bootstrap has no equivalent for
+   -------------------------------------------------------------------------- */
+
+/* 6a. THE AMOUNT.
+   offer.amount is decimal(12,2) and means two different things depending on
+   type — currency for welcome and no_deposit, a count of spins for free_spins —
+   so the unit is always a separate element the view fills in, never baked into
+   the number. Bootstrap's display sizes are fixed steps; this needs to be fluid
+   between breakpoints and tabular so digits line up down a column. */
+.offer-amount {
+    font-family: var(--offer-font-display);
+    font-size: clamp(2.25rem, 1.5rem + 2.6vw, 3.25rem);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.035em;
+    color: var(--offer-type, var(--bs-body-color));
+    font-variant-numeric: tabular-nums;
+}
+
+.offer-amount__unit {
+    font-size: 0.3em;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+
+/* 6b. THE RATING.
+   casino.rating is decimal(2,1), so a 4.6 has to read as 4.6. Two stacked star
+   rows with the filled row clipped to a percentage is the only way to show a
+   tenth of a star — bi-star-half would force rounding to the nearest 0.5, and a
+   4.6 displayed as 4.5 is a wrong number on a page about money. */
+.rating__stars {
+    position: relative;
+    display: inline-block;
+    color: var(--bs-border-color);
+}
+
+.rating__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    color: var(--offer-type, var(--bs-secondary-color));
+}
+
+/* rating 0.0 is the column DEFAULT, so zero means "unrated" far more often than
+   it means "terrible". Five empty stars would be a lie dressed as data, so an
+   unrated casino shows no stars at all and says so instead. That styling is
+   .small .fst-italic .text-body-secondary in the markup — no custom rule. */
+
+/* The empty-state panel in the design uses a dashed outline; Bootstrap 5.3
+   ships no border-style utility, so this is the third and last hand-written
+   rule on these pages. */
+.border-dashed {
+    border-style: dashed !important;
+}
+
+/* The filter's Apply button is disabled until a selection differs from what is
+   already applied, so its passive state has to read as "nothing to apply".
+   Bootstrap's default is 65% opacity, which is nearly invisible on a button
+   that rests at maximum contrast — so the disabled state becomes an outline
+   instead, still through Bootstrap's own button variables. */
+.btn-offer:disabled,
+.btn-offer.disabled {
+    --bs-btn-disabled-color: var(--bs-secondary-color);
+    --bs-btn-disabled-bg: transparent;
+    --bs-btn-disabled-border-color: var(--bs-border-color);
+    opacity: 1;
+}

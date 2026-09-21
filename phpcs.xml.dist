@@ -22,6 +22,7 @@
     <!-- console/migrations stays out: migration class names are snake_case by design -->
     <file>console/controllers</file>
     <file>frontend/assets</file>
+    <file>frontend/components</file>
     <file>frontend/controllers</file>
     <file>frontend/models</file>    
     <file>frontend/views</file>

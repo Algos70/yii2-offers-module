@@ -39,14 +39,22 @@ return [
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
-        /*
         'urlManager' => [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                // The two public routes of the offers module. The slug pattern
+                // matches what SluggableBehavior produces, so a request with
+                // anything else in it never reaches the controller.
+                // Canonical home, so generated links (and the sitemap) say "/"
+                // rather than "/site/index".
+                '' => 'site/index',
+                'offers' => 'offer/index',
+                'offer/<slug:[a-z0-9]+(?:-[a-z0-9]+)*>' => 'offer/view',
+                'casino/<slug:[a-z0-9]+(?:-[a-z0-9]+)*>' => 'casino/view',
+                'sitemap.xml' => 'sitemap/index',
             ],
         ],
-        */
     ],
     'params' => $params,
 ];

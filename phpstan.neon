@@ -16,6 +16,7 @@ parameters:
         - console/controllers
         - console/models
         - frontend/assets
+        - frontend/components
         - frontend/controllers
         - frontend/models
         - frontend/views

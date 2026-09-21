@@ -2,7 +2,9 @@
 extensions:
   enabled:
     - Codeception\Extension\RunProcess:
-        0: php -d variables_order=EGPCS -S localhost:8080 -t web
+        # The router script is what makes /offers and /offer/<slug> resolve on
+        # the built-in server, exactly as in `php yii serve --router=...`.
+        0: php -d variables_order=EGPCS -S localhost:8080 -t web web/router.php
         sleep: 3
 modules:
   config:

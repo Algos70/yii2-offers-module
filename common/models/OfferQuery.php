@@ -58,4 +58,20 @@ class OfferQuery extends ActiveQuery
     {
         return $this->with(['terms']);
     }
+
+    /**
+     * Everything the public site is allowed to show: a published, unexpired
+     * offer belonging to an active casino.
+     *
+     * The listing, the detail page and the home page all start here, so an
+     * offer can never appear in one place and 404 in another. `joinWith()`
+     * both applies the casino condition and eager-loads the relation.
+     */
+    public function publiclyVisible(): self
+    {
+        return $this->active()
+            ->notExpired()
+            ->joinWith('casino')
+            ->andWhere(['casino.is_active' => true]);
+    }
 }
