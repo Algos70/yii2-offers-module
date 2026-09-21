@@ -11,6 +11,8 @@ class OfferTermsFixture extends ActiveFixture
 {
     public $modelClass = OfferTerms::class;
 
+    public $dataFile = '@common/tests/Support/data/offer_terms.php';
+
     /**
      * The foreign key forbids loading terms before their offers.
      */

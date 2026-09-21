@@ -11,6 +11,8 @@ class OfferFixture extends ActiveFixture
 {
     public $modelClass = Offer::class;
 
+    public $dataFile = '@common/tests/Support/data/offer.php';
+
     /**
      * The foreign key forbids loading offers before their casinos.
      */

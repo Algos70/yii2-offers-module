@@ -17,18 +17,9 @@ final class OfferTermsTest extends Unit
     public function _fixtures(): array
     {
         return [
-            'casino' => [
-                'class' => CasinoFixture::class,
-                'dataFile' => codecept_data_dir() . 'casino.php',
-            ],
-            'offer' => [
-                'class' => OfferFixture::class,
-                'dataFile' => codecept_data_dir() . 'offer.php',
-            ],
-            'offerTerms' => [
-                'class' => OfferTermsFixture::class,
-                'dataFile' => codecept_data_dir() . 'offer_terms.php',
-            ],
+            'casino' => ['class' => CasinoFixture::class],
+            'offer' => ['class' => OfferFixture::class],
+            'offerTerms' => ['class' => OfferTermsFixture::class],
         ];
     }
 
