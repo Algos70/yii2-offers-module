@@ -656,24 +656,40 @@ Active | 50.00 | 35x`.
 - `search(array $params): ActiveDataProvider`:
 
 ```php
-$query = Offer::find()->withCasino()->withTerms();   // with(['casino', 'terms'])
+// joinWith() does both jobs: LEFT JOINs (so casino.name and
+// offer_terms.wagering_multiplier are available to ORDER BY / WHERE) and eager
+// loading. It sits OUTSIDE the filter branch, because the sort links are
+// offered even when no filter is set — behind the early return, sorting by
+// casino.name would hit an unjoined table.
+$query = Offer::find()->joinWith(['casino', 'terms']);
 
 $dataProvider = new ActiveDataProvider([
     'query' => $query,
-    'pagination' => ['pageSize' => 20],
+    // Sort and Pagination read Yii::$app->request->queryParams unless told
+    // otherwise. Passing $params makes search() self-contained and testable
+    // without faking a request — without it, ['sort' => '-casino_id'] is
+    // silently ignored.
+    'pagination' => ['pageSize' => 20, 'params' => $params],
     'sort' => [
         'attributes' => [
             'id', 'title', 'type', 'status', 'amount', 'expires_at', 'created_at',
             'casino_id' => [
                 'asc' => ['casino.name' => SORT_ASC],
                 'desc' => ['casino.name' => SORT_DESC],
+                'label' => 'Casino',
             ],
-            'wagering' => [
+            // Keyed after the filter attribute: one grid column carries both
+            // the sort link and the filter input. (`DataColumn` has no `sort`
+            // property — attempting to point a column at a differently named
+            // sort key throws `Setting unknown property`.)
+            'maxWagering' => [
                 'asc' => ['offer_terms.wagering_multiplier' => SORT_ASC],
                 'desc' => ['offer_terms.wagering_multiplier' => SORT_DESC],
+                'label' => 'Wagering',
             ],
         ],
         'defaultOrder' => ['created_at' => SORT_DESC],
+        'params' => $params,
     ],
 ]);
 
@@ -681,32 +697,36 @@ if (!($this->load($params) && $this->validate())) {
     return $dataProvider;
 }
 
-$query->joinWith(['casino', 'terms']);   // JOINs for filtering/sorting; with() still eager-loads
-$query->andFilterWhere(['offer.casino_id' => $this->casino_id])
+$query->andFilterWhere(['offer.id' => $this->id])
+      ->andFilterWhere(['offer.casino_id' => $this->casino_id])
       ->andFilterWhere(['offer.type' => $this->type])
       ->andFilterWhere(['offer.status' => $this->status])
       ->andFilterWhere(['like', 'offer.title', $this->title])
+      ->andFilterWhere(['like', 'offer.slug', $this->slug])
       ->andFilterWhere(['<=', 'offer_terms.wagering_multiplier', $this->maxWagering]);
 ```
 
   Column names are table-qualified because `joinWith` pulls both relations into
-  the query. `joinWith(['terms'])` is a LEFT JOIN, so offers without terms stay
-  visible until the wagering filter is actually used.
+  the query. Both joins are LEFT, so offers without terms stay visible until the
+  wagering filter is actually used.
 - Grid filter row: casino dropdown (same `indexBy('id')->column()` list), type
   and status dropdowns from the enum labels, a title text input, and a
-  "max wagering" number input.
+  "max wagering" number input. `amount` has `'filter' => false`.
 
 **N+1 evidence, two independent checks.**
 
-*a) Automated, `backend/tests/Unit/Models/OfferSearchTest.php`* — the logger
-records one message per executed query under the `yii\db\Command::*` categories:
+*a) Automated, `backend/tests/Unit/Models/OfferSearchTest.php`* — counted from
+the framework logger. Note that **each query produces three log records** under
+the same category (one `LEVEL_INFO`, plus a profiling begin/end pair), so the
+helper filters on the level or the count comes out tripled:
 
 ```php
 private function dbQueryCount(): int
 {
     return count(array_filter(
         Yii::getLogger()->messages,
-        static fn (array $message): bool => str_starts_with((string) $message[2], 'yii\db\Command::'),
+        static fn (array $message): bool => $message[1] === Logger::LEVEL_INFO
+            && str_starts_with((string) $message[2], 'yii\db\Command::'),
     ));
 }
 
@@ -718,42 +738,54 @@ public function testListingDoesNotScaleQueriesWithRowCount(): void
     $models = (new OfferSearch())->search([])->getModels();   // pageSize 20
     $queriesForPage = $this->dbQueryCount() - $before;
 
-    self::assertCount(20, $models);
+    self::assertCount(5, $models);               // five fixture offers
+
+    $touched = [];
     foreach ($models as $offer) {
         self::assertTrue($offer->isRelationPopulated('casino'));
         self::assertTrue($offer->isRelationPopulated('terms'));
-        self::assertNotNull($offer->casino->name);            // touching adds no query
+        self::assertNotSame('', $offer->casino->name);
+        $touched[] = $offer->terms?->wagering_multiplier;   // three of five are null
     }
+    self::assertSame(['35.0', '45.0'], array_values(array_filter($touched)));
+
     self::assertSame($queriesForPage, $this->dbQueryCount() - $before);
     self::assertLessThanOrEqual(4, $queriesForPage);          // COUNT + offers + casinos + terms
 }
 ```
 
-  The `isRelationPopulated()` loop is the precise assertion: drop `withCasino()`
-  or `withTerms()` and the relations turn lazy, so the post-loop count grows by
-  one per row and the test fails. A second assertion repeats `search()` with
-  `pageSize` forced to 100 and requires the same query count.
+  The `isRelationPopulated()` loop is the precise assertion: drop the eager
+  loading and the relations turn lazy, so the post-loop count grows by one per
+  row and the test fails.
 
-*b) Manual, reproducible by a reviewer* — open `/offer/index` with the 30 seeded
-offers and read the Yii Debug toolbar's **DB** panel: the count is identical for
-`pageSize=20` and `pageSize=100`, and the SQL list contains exactly one
-`SELECT ... FROM offer`, one `SELECT COUNT(*)`, one
-`SELECT * FROM casino WHERE id IN (...)` and one
-`SELECT * FROM offer_terms WHERE offer_id IN (...)`. The observed numbers go
-into the README (Story 3.2).
+*b) Measured on the dev database* (steady state, schema cache warm):
 
-**Acceptance:** `backend/tests/Functional/OfferFilterCest.php`, logged in via
-`UserFixture` with the three domain fixtures loaded:
-1. `/offer/index` lists page 1 and renders the pager;
-2. `OfferSearch[type]=free_spins` shows only free-spin titles;
-3. `OfferSearch[casino_id]=…` shows only that casino's offers;
-4. `OfferSearch[status]=draft` shows only drafts;
-5. `OfferSearch[maxWagering]=35` hides an offer whose terms say `40`;
-6. `sort=-title` reorders the first row;
-7. `OfferSearch[type]=bogus` is dropped by the `in` rule — unfiltered list, no
-   error, no SQL failure.
-Plus the unit test above.
-Run: `php vendor/bin/codecept run backend/tests --env php-builtin`.
+```
+pageSize=20   queries=4
+pageSize=100  queries=4
+```
+
+  The four are `SELECT COUNT(*) FROM offer LEFT JOIN casino LEFT JOIN
+  offer_terms`, `SELECT offer.* FROM offer LEFT JOIN ...`,
+  `SELECT * FROM casino WHERE id IN (...)` and
+  `SELECT * FROM offer_terms WHERE offer_id IN (...)` — constant in the number
+  of rows rendered. A cold run adds one-off schema introspection
+  (`SHOW FULL COLUMNS`, `SHOW CREATE TABLE`, key lookups) per table, which the
+  schema cache serves afterwards; measure warm or the numbers mislead.
+  A reviewer can reproduce it from the Yii Debug toolbar's **DB** panel once
+  Story 3.1 has seeded 30 offers; those numbers go into the README (Story 3.2).
+
+**Acceptance (as built):** `backend/tests/Functional/OfferFilterCest.php` (8
+cases) drives real requests: the list renders every offer;
+`OfferSearch[type]=free_spins`, `[status]=draft`, `[casino_id]=2` and
+`[maxWagering]=40` each narrow it correctly (the last one via the joined
+`offer_terms` column); `[type]=cashback` is dropped by the `in` rule — HTTP 200,
+full list, no SQL error; `sort=title` / `sort=-title` swap the first row; and
+the grid exposes the four filter controls.
+`backend/tests/Unit/Models/OfferSearchTest.php` (10 cases) covers the same
+filters at the model level plus relational sorting by casino name, the
+page size, and the N+1 guard.
+Run: `php vendor/bin/codecept run backend/tests`.
 
 **Commit:** `feat(backend): add offer search with filters, sorting and pagination`
 
@@ -925,6 +957,7 @@ story sections above are kept in sync; this is the short list.
 | 2.1 nav + gate | done | Nav only; the 302 gate check belongs to the controllers and moved to 2.2/2.3. Covered by `NavigationCest` (guest vs. signed in). |
 | 2.2 casino CRUD | done | `is_active` default had to be set on the create form, not just in `rules()`. Domain fixtures gained `$dataFile = '@common/tests/Support/data/...'` defaults, because `codecept_data_dir()` resolves per suite and the backend suite could not see `common/`'s data files. CSRF rejection (400) turned into its own assertion rather than a test failure. |
 | 2.3 offer CRUD | done | Plan's `Model::loadMultiple()` was wrong for two different models (it is a tabular-input helper); replaced with one `load()` per model plus `validateMultiple()`. `actionIndex()` ships a plain `ActiveDataProvider` until 2.4 replaces it. `findModel()` eager-loads casino and terms. |
+| 2.4 offer search | done | Three plan-level corrections: `joinWith()` must sit outside the filter branch (relational sorting is offered with no filter set); `Sort`/`Pagination` read request query params unless `'params' => $params` is passed, so the planned `search(['sort' => ...])` was silently ignored; `DataColumn` has no `sort` property, so the wagering sort key was renamed to match the filter attribute. Query count measured at 4, constant for `pageSize` 20 and 100 — count only `LEVEL_INFO` log records, each query logs three. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
