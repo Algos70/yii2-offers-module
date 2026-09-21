@@ -3,7 +3,6 @@ services:
   mysql:
     image: mysql:8.4
     container_name: yii2-offers-mysql
-    command: --default-authentication-plugin=caching_sha2_password
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: yii2_offers
