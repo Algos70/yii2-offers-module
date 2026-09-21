@@ -484,13 +484,19 @@ with `roles => ['@']`). Views use `yii\bootstrap5\ActiveForm` and core
 
 ### Story 2.1 — admin shell: access gate and navigation
 
-**Files:** modify `backend/views/layouts/_header.php`
+**Files:** modify `backend/views/layouts/_header.php`; create
+`backend/tests/Functional/NavigationCest.php`
 
 Add `Casinos` (`['/casino/index']`) and `Offers` (`['/offer/index']`) nav items,
-both `'visible' => !Yii::$app->user->isGuest`, before the Logout item.
+both `'visible' => !Yii::$app->user->isGuest`, before the Login/Logout items.
 
-**Acceptance:** logged out, `/index.php?r=offer/index` redirects to `site/login`
-(302); logged in, both links render and resolve.
+**Acceptance (as built):** `NavigationCest` asserts a guest sees neither link
+and a signed-in user sees both. The planned "guest hitting `/offer/index` is
+redirected to `site/login` (302)" check **moves to Stories 2.2 and 2.3**: the
+redirect comes from each controller's `AccessControl` filter, and until those
+controllers exist the route 404s instead — a nav entry cannot gate anything by
+itself.
+Run: `php vendor/bin/codecept run backend/tests`.
 
 **Commit:** `feat(backend): add casino and offer navigation entries`
 
@@ -863,6 +869,7 @@ story sections above are kept in sync; this is the short list.
 | 1.5 Casino | done | `getOffers()` moved to 1.6 (PHPStan `class.notFound` on the forward reference). |
 | 1.6 Offer + OfferQuery | done | Expiry split into two validators; `notExpired()` binds a PHP timestamp instead of MySQL `NOW()`; `getTerms()`, `withTerms()` and `saveWithTerms()` moved to 1.7. |
 | 1.7 OfferTerms | done | Picked up the three deferred pieces. `saveWithTerms()` grew an explicit lifecycle for the optional row: skip when empty, delete when blanked, repopulate the relation after commit. Rollback proven against the DB check constraint, not a mock. |
+| 2.1 nav + gate | done | Nav only; the 302 gate check belongs to the controllers and moved to 2.2/2.3. Covered by `NavigationCest` (guest vs. signed in). |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
