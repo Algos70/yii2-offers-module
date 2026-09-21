@@ -50,4 +50,12 @@ class OfferQuery extends ActiveQuery
     {
         return $this->with(['casino']);
     }
+
+    /**
+     * Eager-loads the bonus terms; needed wherever a list renders or filters them.
+     */
+    public function withTerms(): self
+    {
+        return $this->with(['terms']);
+    }
 }

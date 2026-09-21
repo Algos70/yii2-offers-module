@@ -26,6 +26,7 @@ use yii\db\ActiveRecord;
  * @property int $updated_at
  *
  * @property-read Casino $casino
+ * @property-read OfferTerms|null $terms
  */
 class Offer extends ActiveRecord
 {
@@ -153,5 +154,54 @@ class Offer extends ActiveRecord
     public function getCasino(): ActiveQuery
     {
         return $this->hasOne(Casino::class, ['id' => 'casino_id']);
+    }
+
+    public function getTerms(): ActiveQuery
+    {
+        return $this->hasOne(OfferTerms::class, ['offer_id' => 'id']);
+    }
+
+    /**
+     * Writes the offer and its terms as one unit.
+     *
+     * Both models are expected to be validated already (the controller does it
+     * with `Model::validateMultiple()`), so this only owns the transaction and
+     * the foreign key wiring. Terms that the admin left completely blank are
+     * not written at all, and an existing blank-out deletes the row, so the
+     * table never holds all-null noise.
+     */
+    public function saveWithTerms(OfferTerms $terms): bool
+    {
+        $transaction = static::getDb()->beginTransaction();
+
+        try {
+            if (!$this->save(false)) {
+                $transaction->rollBack();
+
+                return false;
+            }
+
+            if ($terms->isEmpty()) {
+                if (!$terms->getIsNewRecord()) {
+                    $terms->delete();
+                }
+            } else {
+                $terms->offer_id = $this->id;
+                if (!$terms->save(false)) {
+                    $transaction->rollBack();
+
+                    return false;
+                }
+            }
+
+            $transaction->commit();
+            $this->populateRelation('terms', $terms->isEmpty() ? null : $terms);
+
+            return true;
+        } catch (\Throwable $exception) {
+            $transaction->rollBack();
+
+            throw $exception;
+        }
     }
 }
