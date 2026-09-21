@@ -87,59 +87,6 @@ class User extends ActiveRecord implements IdentityInterface
     }
 
     /**
-     * Finds user by password reset token
-     *
-     * @param string $token password reset token
-     * @return static|null
-     */
-    public static function findByPasswordResetToken(string $token): User|null
-    {
-        if (!static::isPasswordResetTokenValid($token)) {
-            return null;
-        }
-
-        return static::findOne([
-            'password_reset_token' => $token,
-            'status' => self::STATUS_ACTIVE,
-        ]);
-    }
-
-    /**
-     * Finds user by verification email token
-     *
-     * @param string $token verify email token
-     * @return static|null
-     */
-    public static function findByVerificationToken(string $token): User|null
-    {
-        return static::findOne(
-            [
-                'verification_token' => $token,
-                'status' => self::STATUS_INACTIVE,
-            ],
-        );
-    }
-
-    /**
-     * Finds out if password reset token is valid
-     *
-     * @param string|null $token password reset token
-     * @return bool
-     */
-    public static function isPasswordResetTokenValid(string|null $token): bool
-    {
-        if ($token === null || $token === '') {
-            return false;
-        }
-
-        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
-
-        return $timestamp + $expire >= time();
-    }
-
-    /**
      * {@inheritdoc}
      */
     public function getId(): int
@@ -190,29 +137,5 @@ class User extends ActiveRecord implements IdentityInterface
     public function generateAuthKey(): void
     {
         $this->auth_key = Yii::$app->security->generateRandomString();
-    }
-
-    /**
-     * Generates new password reset token
-     */
-    public function generatePasswordResetToken(): void
-    {
-        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-    }
-
-    /**
-     * Generates new token for email verification
-     */
-    public function generateEmailVerificationToken(): void
-    {
-        $this->verification_token = Yii::$app->security->generateRandomString() . '_' . time();
-    }
-
-    /**
-     * Removes password reset token
-     */
-    public function removePasswordResetToken(): void
-    {
-        $this->password_reset_token = null;
     }
 }

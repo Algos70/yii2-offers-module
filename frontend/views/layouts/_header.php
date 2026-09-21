@@ -14,32 +14,12 @@ $items = [
         'url' => ['/site/index'],
     ],
     [
-        'label' => 'About',
-        'url' => ['/site/about'],
+        'label' => 'Offers',
+        'url' => ['/offer/index'],
     ],
-    [
-        'label' => 'Contact',
-        'url' => ['/site/contact'],
-    ],
-    [
-        'label' => 'Signup',
-        'url' => ['/site/signup'],
-        'visible' => Yii::$app->user->isGuest,
-    ],
-    [
-        'label' => 'Login',
-        'url' => ['/site/login'],
-        'visible' => Yii::$app->user->isGuest,
-    ],
-    [
-        'label' => 'Logout (' . Html::encode(Yii::$app->user->identity?->username) . ')',
-        'url' => ['/site/logout'],
-        'linkOptions' => [
-            'data-method' => 'post',
-            'class' => 'logout',
-        ],
-        'visible' => !Yii::$app->user->isGuest,
-    ],
+    // No About or Contact: this site publishes offers and nothing else.
+    // No auth entries either — the public site has no accounts; staff sign in
+    // through the backend application.
 ];
 
 ?>
