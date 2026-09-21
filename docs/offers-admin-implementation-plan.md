@@ -803,28 +803,59 @@ deterministic and idempotent (a row whose slug already exists is skipped; the
 command reports how many were created). Distribution makes the filters and
 pagination visible:
 
-- 5 casinos, mixed `is_active`, ratings 3.5–4.9.
-- 30 offers across all 3 types and all 3 statuses, at least 12 active and
-  non-expired, some with `expires_at = NULL`, some past-dated with
-  `status = 'expired'`, some `draft`.
-- Terms coherent per type: `welcome` → `min_deposit` set, wagering 20–45;
-  `no_deposit` → `min_deposit` null, `max_cashout` set, wagering 40–60;
-  `free_spins` → `valid_days` set, `min_deposit` mostly null.
-  Wagering values straddle 35 so the "max wagering" filter shows a difference.
+- 5 casinos, mixed `is_active`, ratings 3.8–4.7.
+- 30 offers — six per casino, so every type and status occurs: as built,
+  15 `welcome` / 10 `free_spins` / 5 `no_deposit`, and
+  20 `active` / 5 `draft` / 5 `expired`, with 20 publicly visible
+  (active and not expired) and 5 already lapsed.
+- Terms coherent per type: `welcome` → `min_deposit` set, wagering 35–45;
+  `no_deposit` → `min_deposit` null, `max_cashout` set, wagering 60;
+  `free_spins` → `valid_days` set, wagering 25. Values straddle 35 so the
+  "max wagering" filter shows a difference. 20 of the 30 offers carry a terms
+  row; the other 10 (drafts and expired ones) have none, which exercises the
+  optional side of the relation.
 - Each pair is written through `Offer::saveWithTerms()` after
   `Model::validateMultiple()`, inside one outer transaction — the seed cannot
   drift from the validation rules, and a partial seed is impossible.
+- **Backdating.** A lapsed offer cannot be *created*: a past `expires_at` is
+  rejected by design. The seed therefore inserts those rows without a date and
+  then `updateAttributes(['expires_at' => …])` to a past timestamp,
+  reproducing what actually happens — time passing after publication — instead
+  of weakening the validator to suit the fixture.
 
 `php yii seed/admin <username> <email> <password>` creates one active user so a
 fresh database has a reachable admin panel. Justification: "Admin (behind a
 login)" is a requirement and the template's frontend signup needs e-mail
 verification, which is file-transport-only in dev.
 
-**Acceptance:** on a freshly migrated database `php yii seed/offers` prints
-`5 casinos, 30 offers`; a second run creates nothing; `/offer/index` shows a
-2-page grid (30 rows, 20 per page); every filter yields a non-empty result for
-at least one value; `SELECT COUNT(*) FROM offer_terms` equals the number of
-offers that have terms.
+**Rule change this story forced.** The seed's draft offers carry no terms at
+all, and a `welcome` draft was rejected by "Min deposit cannot be blank." —
+the conditional rule fired even though `isEmpty()` meant **no terms row would
+be written**. The condition is now
+`offerType === welcome && !$model->isEmpty()`: state a minimum deposit if you
+state any terms, but an offer still being sketched out is free of it. Two unit
+tests pin both halves (`testEmptyTermsAreValidEvenForAWelcomeOffer`,
+`testPartiallyFilledWelcomeTermsStillRequireTheMinimumDeposit`).
+
+**Acceptance (as built):** `php yii seed/offers` on an empty schema prints
+`5 casinos, 30 offers created.` / `Totals: 5 casinos, 30 offers, 20 terms
+rows.`; a second run prints `0 casinos, 0 offers created.` with identical
+totals. Automated coverage lives in
+`common/tests/Unit/Console/SeedControllerTest.php` (8 cases): counts,
+idempotency, every type and status present, more than one page of rows, at
+least ten publicly visible offers, lapsed rows exist, wagering straddles 35,
+no `no_deposit` offer carries a `min_deposit`, and some offers have no terms
+row. The console application has no Codeception suite in this template, so the
+test lives in the common suite and silences the command's output with an
+anonymous subclass rather than changing production code.
+
+**Browser evidence (admin UI, 30 seeded offers):** `/offer/index` shows
+"Showing 1-20 of 30 items." with a 2-page pager; page 2 shows "Showing 21-30
+of 30 items." with 10 rows; `type=free_spins` → 10 rows, `status=draft` → 5
+rows, `maxWagering=35` → 10 rows. The debug toolbar reports **DB 18** on both
+page 1 (20 rows) and page 2 (10 rows) — constant in rows rendered. That figure
+covers the whole request (session, user identity, debug panels); the listing's
+own share is the 4 queries measured in Story 2.4.
 
 **Commit:** `feat(console): add seed command for casinos and offers`
 
@@ -958,6 +989,7 @@ story sections above are kept in sync; this is the short list.
 | 2.2 casino CRUD | done | `is_active` default had to be set on the create form, not just in `rules()`. Domain fixtures gained `$dataFile = '@common/tests/Support/data/...'` defaults, because `codecept_data_dir()` resolves per suite and the backend suite could not see `common/`'s data files. CSRF rejection (400) turned into its own assertion rather than a test failure. |
 | 2.3 offer CRUD | done | Plan's `Model::loadMultiple()` was wrong for two different models (it is a tabular-input helper); replaced with one `load()` per model plus `validateMultiple()`. `actionIndex()` ships a plain `ActiveDataProvider` until 2.4 replaces it. `findModel()` eager-loads casino and terms. |
 | 2.4 offer search | done | Three plan-level corrections: `joinWith()` must sit outside the filter branch (relational sorting is offered with no filter set); `Sort`/`Pagination` read request query params unless `'params' => $params` is passed, so the planned `search(['sort' => ...])` was silently ignored; `DataColumn` has no `sort` property, so the wagering sort key was renamed to match the filter attribute. Query count measured at 4, constant for `pageSize` 20 and 100 — count only `LEVEL_INFO` log records, each query logs three. |
+| 3.1 seed | done | Seeding real data exposed two rule collisions. A lapsed offer cannot be created (past `expires_at` is rejected), so those rows are inserted dateless and backdated with `updateAttributes()`. A `welcome` draft with no terms was rejected by the min-deposit rule, which now also requires `!isEmpty()` — no terms row, nothing to require. Test lives in the common suite: the console app has no Codeception suite here. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
