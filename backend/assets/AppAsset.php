@@ -12,6 +12,7 @@ namespace backend\assets;
 
 use common\assets\ColorModeAsset;
 use yii\bootstrap5\BootstrapAsset;
+use yii\bootstrap5\BootstrapIconAsset;
 use yii\web\AssetBundle;
 use yii\web\YiiAsset;
 
@@ -28,6 +29,10 @@ class AppAsset extends AssetBundle
     public $depends = [
         YiiAsset::class,
         BootstrapAsset::class,
+        // GridView's ActionColumn renders Bootstrap 3 glyphicon markup, which
+        // Bootstrap 5 dropped; the grids below replace those icons with `bi`
+        // ones, which need this font bundle.
+        BootstrapIconAsset::class,
         ColorModeAsset::class,
     ];
 }
