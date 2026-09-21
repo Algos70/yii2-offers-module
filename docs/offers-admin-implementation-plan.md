@@ -248,9 +248,24 @@ enum OfferType: string
 `values()` feeds every `in` validator; `labels()` feeds every `ActiveForm`
 dropdown and `GridView` filter, so admin copy has one source.
 
-**Acceptance:** `common/tests/Unit/Enums/OfferTypeTest.php` asserts
-`OfferType::values() === ['welcome', 'no_deposit', 'free_spins']` and that
-`labels()` has a key for every case (so adding a case without a label fails).
+Both enums also expose `labelFor(?string $value): string`, because AR
+attributes are raw strings in views and `OfferType::from($offer->type)` would
+throw on unexpected data.
+
+**Acceptance (as built):** `common/tests/Unit/Enums/OfferTypeTest.php` and
+`OfferStatusTest.php` assert the exact `values()` order, that `labels()` has a
+key for every case and no extras, that `labelFor()` returns `''` for unknown
+and `null` input — plus a **drift guard** that reads the live column
+definition, since the PHP enum and the MySQL `ENUM` are two declarations of one
+domain:
+
+```php
+$column = Yii::$app->db->getTableSchema('{{%offer}}', true)?->getColumn('type');
+self::assertSame(OfferType::values(), $column->enumValues);
+```
+
+Adding a case without a migration (or vice versa) then fails in CI instead of
+at insert time.
 Run: `php vendor/bin/codecept run common/tests/Unit`.
 
 **Commit:** `feat(domain): add offer type and status enums`
@@ -285,6 +300,10 @@ Run: `php vendor/bin/codecept run common/tests/Unit`.
   - `rating` — `required`, `number` with `min => 0`, `max => 5`.
   - `is_active` — `boolean`, `default` value `true`.
 - `getOffers(): ActiveQuery` — `hasMany(Offer::class, ['casino_id' => 'id'])`.
+  **Deferred to Story 1.6** during implementation: `Offer` does not exist yet at
+  this point and the repo's PHPStan run (level 5) fails the forward reference
+  with three `class.notFound` errors. The relation and its `@property-read`
+  docblock are added when `Offer` lands.
 - `attributeLabels()` — `is_active` as "Active", `rating` as "Rating (0-5)".
 
 **Acceptance:** `common/tests/Unit/Models/CasinoTest.php` covers: blank slug is
@@ -319,19 +338,31 @@ Run: `php vendor/bin/codecept run common/tests/Unit`.
     `expired`. Null is allowed.
   - Consistency: `status = 'active'` together with an already-past `expires_at`
     is rejected with the error attached to `status` ("an expired offer cannot be
-    active").
+    active"). Implemented as a **second, separate** inline validator
+    (`validateStatusAgainstExpiry()`), not as part of the expiry rule: it must
+    fire even when `expires_at` was not touched in this request, while
+    `validateExpiresAtInFuture()` must not.
+- `isExpired(): bool` — helper used by views and by the status rule's tests.
 - Relations:
   - `getCasino(): ActiveQuery` — `hasOne(Casino::class, ['id' => 'casino_id'])`.
   - `getTerms(): ActiveQuery` — `hasOne(OfferTerms::class, ['offer_id' => 'id'])`.
+    **Deferred to Story 1.7** for the same reason as `Casino::getOffers()`:
+    `OfferTerms` does not exist yet and PHPStan rejects the forward reference.
 - `public static function find(): OfferQuery` with:
   - `active()` — `andWhere(['offer.status' => OfferStatus::Active->value])`
-  - `notExpired()` — `andWhere(['or', ['offer.expires_at' => null], ['>', 'offer.expires_at', new Expression('NOW()')]])`
+  - `notExpired()` — `andWhere(['or', ['offer.expires_at' => null], ['>', 'offer.expires_at', date('Y-m-d H:i:s')]])`.
+    The boundary is a **PHP-bound timestamp, not MySQL `NOW()`**: validation
+    compares against PHP's clock, MySQL's `@@session.time_zone` defaults to
+    `SYSTEM`, and two clocks would let a row be "expired" for the validator and
+    "live" for the query. Verified that the bound literal still uses
+    `idx-offer-status-expires_at` (`EXPLAIN` reports the index).
   - `withCasino()` — `with(['casino'])`
-  - `withTerms()` — `with(['terms'])`
+  - `withTerms()` — `with(['terms'])`. **Deferred to Story 1.7** with the relation.
   These are the listing and sitemap primitives; the admin search model uses
   `withCasino()`, the detail views add `withTerms()`.
 - `saveWithTerms(OfferTerms $terms): bool` — the aggregate write, so controllers
-  stay thin and the transaction rule cannot be forgotten:
+  stay thin and the transaction rule cannot be forgotten. **Deferred to Story
+  1.7**, since its parameter type is `OfferTerms`:
 
 ```php
 public function saveWithTerms(OfferTerms $terms): bool
@@ -356,22 +387,40 @@ public function saveWithTerms(OfferTerms $terms): bool
 }
 ```
 
-**Acceptance:** `common/tests/Unit/Models/OfferTest.php` covers: unknown `type`
-fails; `casino_id` pointing at a missing casino fails; `expires_at` set to
-yesterday fails on create; `status = 'active'` with a past `expires_at` fails;
-blank slug derived from title; `Offer::find()->active()->notExpired()` excludes
-draft, expired-status and past-dated rows; `saveWithTerms()` leaves no offer row
-behind when the terms insert fails (force a failure with an out-of-range value
-that trips the DB check).
-Fixtures: `common/fixtures/{CasinoFixture,OfferFixture,OfferTermsFixture}.php`
-plus `common/tests/Support/data/{casino,offer,offer_terms}.php`.
+**Acceptance (as built, 16 cases):** `common/tests/Unit/Models/OfferTest.php`
+covers: unknown `type` and unknown `status` fail; `casino_id` pointing at a
+missing casino fails; a malformed `expires_at` (`31/12/2030`) fails; a new
+`expires_at` in the past fails while a future one and `null` pass; a **stored**
+past expiry can still be edited (title change validates); publishing that same
+lapsed row fails on `status`; `status` defaults to `draft`; blank slug derived
+from title and made unique (`visible-welcome-bonus-2`); negative `amount`
+fails; `Offer::find()->active()->notExpired()` returns exactly `[1, 2]` of the
+five fixture rows; `withCasino()` populates the relation on every row;
+`Casino::findOne(2)->offers` returns that casino's offers; `isExpired()`
+matches the stored date.
+Fixtures: `common/fixtures/{CasinoFixture,OfferFixture}.php` plus
+`common/tests/Support/data/{casino,offer}.php`. `OfferFixture::$depends`
+names `CasinoFixture` because the FK forbids the other order. One fixture row
+(`activeButLapsed`) is deliberately in a state the model rules forbid —
+`status = 'active'` with a past expiry — because that is exactly the stale row
+`notExpired()` must hide, and only direct table writes can produce it.
+`saveWithTerms()` coverage moves to Story 1.7 with the method itself.
 Run: `php yii_test migrate --interactive=0 && php vendor/bin/codecept run common/tests/Unit`.
 
 **Commit:** `feat(domain): add offer model with validation and query scopes`
 
 ### Story 1.7 — `OfferTerms` model
 
-**Files:** create `common/models/OfferTerms.php`
+**Files:** create `common/models/OfferTerms.php`,
+`common/fixtures/OfferTermsFixture.php`,
+`common/tests/Support/data/offer_terms.php`; modify `common/models/Offer.php`
+and `common/models/OfferQuery.php`
+
+**Also lands here** (deferred out of Story 1.6, where the class did not exist
+yet and PHPStan rejected the forward references):
+- `Offer::getTerms(): ActiveQuery` plus its `@property-read` docblock entry;
+- `OfferQuery::withTerms()`;
+- `Offer::saveWithTerms(OfferTerms $terms): bool` and its rollback test.
 
 - `tableName(): '{{%offer_terms}}'`, `behaviors(): [TimestampBehavior::class]`,
   primary key is `offer_id` (Yii reads it from the schema; no override needed).
@@ -785,3 +834,29 @@ Open decisions to confirm before Epic 1
 3. **`rating` scale.** `DECIMAL(2,1)`, 0.0–5.0.
 4. **`expires_at` granularity.** `DATETIME`; plain `DATE` would be simpler if
    offers only ever expire at day boundaries.
+
+Implementation log
+------------------
+
+Deviations from the plan as written, and facts established while building. The
+story sections above are kept in sync; this is the short list.
+
+| story | status | note |
+|-------|--------|------|
+| 1.1 casino table | done | `DECIMAL(2,1)` caps the column at `9.9`, so `chk-casino-rating` is what actually enforces 0–5. Verified: `rating = 9.0` → `ERROR 3819`; duplicate slug → `ERROR 1062`. |
+| 1.2 offer table | done | A bad `ENUM` value surfaces as `ERROR 1265 Data truncated`, which only rejects under strict mode (MySQL 8.4 default). The model's `in` rule is the primary gate; the column is defence in depth. `EXPLAIN` confirms `idx-offer-status-expires_at` is chosen for the public predicate. |
+| 1.3 offer_terms table | done | 1:1 verified structurally: a second row for the same `offer_id` fails on the primary key; deleting a casino cascades two levels (offer → offer_terms). |
+| 1.4 enums | done | Added `labelFor()` and the schema drift guard beyond the planned assertions. |
+| 1.5 Casino | done | `getOffers()` moved to 1.6 (PHPStan `class.notFound` on the forward reference). |
+| 1.6 Offer + OfferQuery | done | Expiry split into two validators; `notExpired()` binds a PHP timestamp instead of MySQL `NOW()`; `getTerms()`, `withTerms()` and `saveWithTerms()` moved to 1.7. |
+
+**Rule adopted from 1.5 onward:** a story may not ship code that fails
+`php vendor/bin/phpstan analyse`. Forward references to classes a later story
+creates are therefore deferred to that story rather than written early.
+
+**Clock rule (from 1.6):** expiry is compared against PHP's clock everywhere —
+validators use `time()`, queries bind `date('Y-m-d H:i:s')`. MySQL `NOW()` is
+not used, because `@@session.time_zone` defaults to `SYSTEM` and a DB server in
+another zone would disagree with the validators. Observed on this machine:
+`yii timeZone=UTC`, PHP and MySQL both at `14:34:06` — agreeing today by
+configuration, not by construction.
