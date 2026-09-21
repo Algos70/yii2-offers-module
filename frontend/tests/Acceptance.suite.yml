@@ -12,4 +12,6 @@ modules:
             part: orm
             entryScript: index-test.php
             cleanup: false
+        # assert* helpers, for checks that are not page interactions
+        - Asserts
 step_decorators: ~
