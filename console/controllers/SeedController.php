@@ -278,6 +278,9 @@ class SeedController extends Controller
                 ],
             ],
             [
+                // Spins tied to a qualifying deposit, which is how most free-spin
+                // offers actually work. The other free-spins template below is
+                // claimable without paying in, so both shapes are in the data.
                 "$casinoName Free Spins Friday",
                 OfferType::FreeSpins->value,
                 '100.00',
@@ -285,6 +288,7 @@ class SeedController extends Controller
                 'soon',
                 [
                     'wagering_multiplier' => '25.0',
+                    'min_deposit' => '20.00',
                     'max_cashout' => '100.00',
                     'valid_days' => 7,
                     'terms_note' => 'Spins credited over five days.',

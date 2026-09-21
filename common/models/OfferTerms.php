@@ -15,6 +15,21 @@ use yii\db\ActiveRecord;
  * `offer_id` is both the primary key and the foreign key, so an offer carries at
  * most one terms row and the row dies with its offer.
  *
+ * What the industry means by these fields, since the validation encodes it:
+ *
+ * - A **no-deposit** bonus is claimed without paying in - that is the whole
+ *   definition - so `min_deposit` must stay blank. It may still carry wagering
+ *   (20x-60x is normal) and a `max_cashout` cap, which is how operators bound
+ *   their exposure on a giveaway; neither is restricted here.
+ * - A **welcome** bonus is a deposit match, so once any terms are stated the
+ *   qualifying `min_deposit` must be among them.
+ * - **Free spins** go both ways: often tied to a qualifying deposit, sometimes
+ *   given outright. `min_deposit` is therefore optional, never forbidden.
+ *
+ * A no-deposit offer that is also the site's welcome offer exists in the wild
+ * but is rare; `type` is a single column, so such an offer is filed under
+ * no-deposit, which is the term that carries the player-facing meaning.
+ *
  * @property int $offer_id
  * @property string|null $wagering_multiplier decimal(5,1), returned as a string by PDO
  * @property string|null $min_deposit decimal(10,2)

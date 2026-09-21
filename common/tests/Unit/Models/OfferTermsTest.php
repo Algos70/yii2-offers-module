@@ -122,6 +122,39 @@ final class OfferTermsTest extends Unit
         self::assertArrayHasKey('min_deposit', $terms->getErrors());
     }
 
+    /**
+     * Free spins are the ambiguous type: the common industry offer is spins
+     * unlocked by a qualifying deposit, but spins given outright exist too. So
+     * a minimum deposit must be neither required nor rejected here - unlike a
+     * welcome bonus, which needs one, and a no-deposit bonus, which forbids it.
+     */
+    public function testFreeSpinsMayOrMayNotRequireADeposit(): void
+    {
+        $depositLinked = new OfferTerms(['wagering_multiplier' => '25', 'min_deposit' => '20']);
+        $depositLinked->offerType = OfferType::FreeSpins->value;
+        self::assertTrue($depositLinked->validate(), print_r($depositLinked->getErrors(), true));
+
+        $givenOutright = new OfferTerms(['wagering_multiplier' => '25']);
+        $givenOutright->offerType = OfferType::FreeSpins->value;
+        self::assertTrue($givenOutright->validate(), print_r($givenOutright->getErrors(), true));
+    }
+
+    /**
+     * A no-deposit bonus may still carry wagering - 20x-60x is normal - and a
+     * cashout cap. Only the deposit itself is contradictory.
+     */
+    public function testNoDepositTermsAllowWageringAndACashoutCap(): void
+    {
+        $terms = new OfferTerms([
+            'wagering_multiplier' => '60',
+            'max_cashout' => '50',
+            'valid_days' => 3,
+        ]);
+        $terms->offerType = OfferType::NoDeposit->value;
+
+        self::assertTrue($terms->validate(), print_r($terms->getErrors(), true));
+    }
+
     public function testRelationsAreWiredBothWays(): void
     {
         $offer = Offer::findOne(1);
