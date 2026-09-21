@@ -861,17 +861,32 @@ own share is the 4 queries measured in Story 2.4.
 
 ### Story 3.2 — README: schema, admin usage, N+1 evidence
 
-**Files:** modify `README.md`
+**Files:** modify `README.md`, `phpcs.xml.dist`
 
-Add: the three new tables, their indexes and the 1:1 terms relationship (with
-one sentence on why terms are a child table); `php yii migrate` and
-`php yii seed/*` in the setup flow; how to reach the admin panel; and an
-**"N+1 check"** section stating the method from Story 2.4 — debug toolbar DB
-panel count constant across `pageSize`, plus the guard test — with the observed
-numbers.
+README now carries: the three tables with their indexes and checks, why terms
+are a 1:1 child table, the validation rules a reader would otherwise have to
+reverse-engineer from `rules()`, the seed commands in the setup flow, what the
+admin screens offer, and an **"N+1 check"** section with all three pieces of
+evidence (measured counts, the guard test, the debug toolbar reading) plus the
+two traps: queries are logged three times, and a cold run adds schema
+introspection.
 
-**Acceptance:** a reader following the README from a clean clone reaches a
-populated admin offer list.
+`phpcs.xml.dist` gained the directories written since the scaffold
+(`common/enums`, `common/tests/Unit`, `backend/tests/*`,
+`console/controllers`). `console/migrations` stays out on purpose — migration
+class names are snake_case by framework convention and would fail
+`Squiz.Classes.ValidClassName`. This also fixed the command the README first
+suggested: passing paths on the command line **overrides** the ruleset's file
+list and drags in those migrations, so the documented invocation is plain
+`php vendor/bin/phpcs --standard=phpcs.xml.dist`.
+
+**Acceptance (as built):** the README's own commands were executed in order on
+a wiped database — `php yii migrate/fresh` (5 migrations),
+`php yii seed/admin` (user #1), `php yii seed/offers`
+(`5 casinos, 30 offers created.`), `php yii_test migrate`,
+`php vendor/bin/codecept build`, `php vendor/bin/codecept run --env php-builtin`
+→ **OK (140 tests, 376 assertions)**, and
+`php vendor/bin/phpcs --standard=phpcs.xml.dist` → clean over 80 files.
 
 **Commit:** `docs: document offers schema, seeding and N+1 check`
 
@@ -990,6 +1005,7 @@ story sections above are kept in sync; this is the short list.
 | 2.3 offer CRUD | done | Plan's `Model::loadMultiple()` was wrong for two different models (it is a tabular-input helper); replaced with one `load()` per model plus `validateMultiple()`. `actionIndex()` ships a plain `ActiveDataProvider` until 2.4 replaces it. `findModel()` eager-loads casino and terms. |
 | 2.4 offer search | done | Three plan-level corrections: `joinWith()` must sit outside the filter branch (relational sorting is offered with no filter set); `Sort`/`Pagination` read request query params unless `'params' => $params` is passed, so the planned `search(['sort' => ...])` was silently ignored; `DataColumn` has no `sort` property, so the wagering sort key was renamed to match the filter attribute. Query count measured at 4, constant for `pageSize` 20 and 100 — count only `LEVEL_INFO` log records, each query logs three. |
 | 3.1 seed | done | Seeding real data exposed two rule collisions. A lapsed offer cannot be created (past `expires_at` is rejected), so those rows are inserted dateless and backdated with `updateAttributes()`. A `welcome` draft with no terms was rejected by the min-deposit rule, which now also requires `!isEmpty()` — no terms row, nothing to require. Test lives in the common suite: the console app has no Codeception suite here. |
+| 3.2 README | done | Also widened `phpcs.xml.dist` to the directories added since the scaffold; migrations stay excluded (snake_case class names). Passing paths to `phpcs` overrides the ruleset's file list — the README documents the bare invocation. Whole README path re-run from a wiped database: 140 tests, 376 assertions green. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
