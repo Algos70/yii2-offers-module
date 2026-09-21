@@ -80,9 +80,11 @@ class OfferTerms extends ActiveRecord
             [['terms_note'], 'trim'],
             [['terms_note'], 'string', 'max' => 500],
 
-            // A welcome bonus without a minimum deposit is meaningless.
+            // A welcome bonus that states any terms at all must state its
+            // minimum deposit. An offer with no terms yet (a draft being
+            // sketched out) writes no row, so there is nothing to require.
             [['min_deposit'], 'required', 'when' => static fn (self $model): bool
-                => $model->offerType === OfferType::Welcome->value],
+                => $model->offerType === OfferType::Welcome->value && !$model->isEmpty()],
             // ... and a no-deposit offer must not carry one.
             [['min_deposit'], 'validateNotApplicable', 'when' => static fn (self $model): bool
                 => $model->offerType === OfferType::NoDeposit->value],

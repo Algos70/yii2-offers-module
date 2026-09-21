@@ -101,6 +101,27 @@ final class OfferTermsTest extends Unit
         self::assertFalse($filled->isEmpty());
     }
 
+    public function testEmptyTermsAreValidEvenForAWelcomeOffer(): void
+    {
+        // A draft being sketched out has no terms yet, and an empty terms
+        // object writes no row, so the min-deposit requirement does not apply.
+        $terms = new OfferTerms();
+        $terms->offerType = OfferType::Welcome->value;
+
+        self::assertTrue($terms->isEmpty());
+        self::assertTrue($terms->validate(), print_r($terms->getErrors(), true));
+    }
+
+    public function testPartiallyFilledWelcomeTermsStillRequireTheMinimumDeposit(): void
+    {
+        $terms = new OfferTerms(['wagering_multiplier' => '35']);
+        $terms->offerType = OfferType::Welcome->value;
+
+        self::assertFalse($terms->isEmpty());
+        self::assertFalse($terms->validate());
+        self::assertArrayHasKey('min_deposit', $terms->getErrors());
+    }
+
     public function testRelationsAreWiredBothWays(): void
     {
         $offer = Offer::findOne(1);
