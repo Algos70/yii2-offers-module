@@ -57,8 +57,8 @@ final class Sitemap
             ];
         }
 
-        // With nothing published, the two static pages still exist; their date
-        // is then simply the time of the request.
+        // With nothing published, the index pages still exist; their date is
+        // then simply the time of the request.
         $newest = $newest > 0 ? $newest : time();
 
         $urls = [
@@ -71,6 +71,11 @@ final class Sitemap
                 'loc' => Url::to(['/offer/index'], true),
                 'lastmod' => $this->format($newest),
                 'changefreq' => 'daily',
+            ],
+            [
+                'loc' => Url::to(['/casino/index'], true),
+                'lastmod' => $this->format($newest),
+                'changefreq' => 'weekly',
             ],
         ];
 

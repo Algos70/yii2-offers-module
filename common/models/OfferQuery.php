@@ -60,17 +60,28 @@ class OfferQuery extends ActiveQuery
     }
 
     /**
+     * Published and unexpired, without touching the casino table.
+     *
+     * Needed wherever joining `casino` is impossible or wasteful — a
+     * correlated count per casino, for instance, where the outer query already
+     * owns that alias.
+     */
+    public function visibleNow(): self
+    {
+        return $this->active()->notExpired();
+    }
+
+    /**
      * Everything the public site is allowed to show: a published, unexpired
      * offer belonging to an active casino.
      *
-     * The listing, the detail page and the home page all start here, so an
+     * The listings, the detail pages and the sitemap all start here, so an
      * offer can never appear in one place and 404 in another. `joinWith()`
      * both applies the casino condition and eager-loads the relation.
      */
     public function publiclyVisible(): self
     {
-        return $this->active()
-            ->notExpired()
+        return $this->visibleNow()
             ->joinWith('casino')
             ->andWhere(['casino.is_active' => true]);
     }

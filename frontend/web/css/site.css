@@ -499,6 +499,13 @@ a.desc:after {
     --offer-type-rgb: var(--bs-offer-freespins-rgb);
 }
 
+/* Casinos have no type, so their cards bind the accent to the body ink: the
+   hover border and the "view offers" button still work, in a neutral colour. */
+.offer--neutral {
+    --offer-type: var(--bs-body-color);
+    --offer-type-rgb: var(--bs-body-color-rgb);
+}
+
 /* A single utility, named the way Bootstrap names utilities, so the display
    face can be composed onto any element: class="display-6 font-display". */
 .font-display { font-family: var(--offer-font-display); }

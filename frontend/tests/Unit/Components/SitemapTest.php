@@ -28,14 +28,15 @@ final class SitemapTest extends Unit
         ];
     }
 
-    public function testListsTheStaticPagesTheCasinoAndEveryVisibleOffer(): void
+    public function testListsTheIndexPagesTheCasinoAndEveryVisibleOffer(): void
     {
         $locations = $this->locations();
 
-        self::assertCount(5, $locations);
+        self::assertCount(6, $locations);
         self::assertStringEndsWith('/', $locations[0]);                     // home
-        self::assertStringContainsString('/offers', $locations[1]);         // listing
-        self::assertStringContainsString('/casino/fixture-casino-one', $locations[2]);
+        self::assertStringContainsString('/offers', $locations[1]);         // offer listing
+        self::assertStringContainsString('/casinos', $locations[2]);        // casino listing
+        self::assertStringContainsString('/casino/fixture-casino-one', $locations[3]);
         self::assertStringContainsString('visible-welcome-bonus', implode(' ', $locations));
         self::assertStringContainsString('visible-free-spins', implode(' ', $locations));
     }

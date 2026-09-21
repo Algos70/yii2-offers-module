@@ -85,7 +85,9 @@ $typeOptions = ['' => 'All types'] + OfferType::labels();
                 return $widget->getView()->render('_card', ['presenter' => new OfferPresenter($offer)]);
             },
             'layout' => "{items}\n"
-                . '<nav class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4"'
+                // w-100: ListView wraps its whole layout in `options`, which is the
+                // card grid row, so the pager has to claim a line of its own.
+                . '<nav class="w-100 d-flex flex-wrap justify-content-between align-items-center gap-3 mt-4"'
                 . ' aria-label="Offer pages">{summary}{pager}</nav>',
             'summaryOptions' => ['tag' => 'p', 'class' => 'small text-body-secondary mb-0'],
             'summary' => 'Showing {begin}&ndash;{end} of {totalCount}',

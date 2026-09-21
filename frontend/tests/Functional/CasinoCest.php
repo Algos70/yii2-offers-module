@@ -24,6 +24,28 @@ final class CasinoCest
         ];
     }
 
+    public function listingShowsActiveCasinosWithTheirLiveOfferCount(FunctionalTester $I): void
+    {
+        $I->amOnRoute('/casino/index');
+
+        $I->seeResponseCodeIs(200);
+        $I->see('Fixture Casino One');
+        $I->see('2 live offers');
+        $I->see('1 casino listed');
+
+        // The inactive casino has no page, so it is not advertised either.
+        $I->dontSee('Fixture Casino Two');
+    }
+
+    public function listingLinksThroughToTheCasinoPage(FunctionalTester $I): void
+    {
+        $I->amOnRoute('/casino/index');
+
+        $I->click('Fixture Casino One');
+        $I->seeInCurrentUrl('fixture-casino-one');
+        $I->see('Visible Welcome Bonus');
+    }
+
     public function casinoPageListsItsVisibleOffers(FunctionalTester $I): void
     {
         $I->amOnRoute('/casino/view', ['slug' => 'fixture-casino-one']);

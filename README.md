@@ -131,6 +131,7 @@ paths. On PHP's built-in server they need the router script — see *Running*.
 |-----|------|
 | `/` | landing page: catalogue counts, type shortcuts, latest offers |
 | `/offers` | all live offers, filterable by type and casino, 20 per page |
+| `/casinos` | every listed casino with its rating and live offer count |
 | `/offer/<slug>` | one offer with its bonus terms |
 | `/casino/<slug>` | one casino, its rating and its live offers |
 | `/sitemap.xml` | generated from the database |
@@ -150,7 +151,7 @@ on `roles => ['@']`, so any active user is an administrator. Accounts come from
 
 `/sitemap.xml` is built by `frontend/components/Sitemap.php` from the same
 visibility scope, so it can never advertise a URL that 404s. It lists the home
-page, the offer listing, one entry per casino with something to show, and one
+page, both index pages, one entry per casino with something to show, and one
 per visible offer. Draft and expired offers never appear.
 
 `lastmod` is a W3C datetime: for an offer it is the later of `offer.updated_at`

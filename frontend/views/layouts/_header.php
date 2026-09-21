@@ -17,6 +17,10 @@ $items = [
         'label' => 'Offers',
         'url' => ['/offer/index'],
     ],
+    [
+        'label' => 'Casinos',
+        'url' => ['/casino/index'],
+    ],
     // No About or Contact: this site publishes offers and nothing else.
     // No auth entries either — the public site has no accounts; staff sign in
     // through the backend application.

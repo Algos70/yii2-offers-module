@@ -11,6 +11,17 @@ use frontend\tests\Support\AcceptanceTester;
  */
 final class CasinoCest
 {
+    public function casinoListingResolvesAsAPath(AcceptanceTester $I): void
+    {
+        $I->amOnPage('/casinos');
+
+        $I->seeResponseCodeIs(200);
+        $I->see('Casinos', 'h1');
+
+        $I->click('Casinos');           // the nav entry points back here
+        $I->seeCurrentUrlEquals('/casinos');
+    }
+
     public function casinoPageResolvesAsAPath(AcceptanceTester $I): void
     {
         $I->amOnPage('/casino/neon-palace');

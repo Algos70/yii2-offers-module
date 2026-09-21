@@ -50,6 +50,7 @@ return [
                 // rather than "/site/index".
                 '' => 'site/index',
                 'offers' => 'offer/index',
+                'casinos' => 'casino/index',
                 'offer/<slug:[a-z0-9]+(?:-[a-z0-9]+)*>' => 'offer/view',
                 'casino/<slug:[a-z0-9]+(?:-[a-z0-9]+)*>' => 'casino/view',
                 'sitemap.xml' => 'sitemap/index',
