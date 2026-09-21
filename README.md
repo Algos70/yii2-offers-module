@@ -37,7 +37,7 @@ php init --env=Development --overwrite=All   # generates config/*-local.php, run
 docker compose up -d                         # MySQL 8.4 on 127.0.0.1:3306
 php yii migrate                              # schema for yii2_offers
 php yii seed/admin admin admin@example.com admin123   # one activated admin user
-php yii seed/offers                          # 5 casinos, 30 offers, 20 terms rows
+php yii seed/offers                          # 6 casinos, 60 offers, 42 terms rows
 ```
 
 Database defaults (see `common/config/main-local.php`, generated from
@@ -54,14 +54,17 @@ Running
 -------
 
 ```bash
-php yii serve --port=8080 --docroot=@frontend/web   # http://localhost:8080
+# The frontend uses pretty URLs, so the built-in server needs the router
+# script; without it /offers and /offer/<slug> have no file to match and 404.
+php yii serve --port=8080 --docroot=@frontend/web --router=frontend/web/router.php
 php yii serve --port=8081 --docroot=@backend/web    # http://localhost:8081 (admin)
 ```
 
+Apache and nginx do the same thing with a rewrite rule; the router script is
+only for `php yii serve` and the acceptance suite.
+
 The backend is behind a login; use the account created by `seed/admin` above.
-Frontend signup also creates users, but it sends a verification mail — with
-`useFileTransport` the mail is written to `common/runtime/mail` instead of
-being delivered.
+The public site has no accounts at all — see *Public site* below.
 
 Schema
 ------
@@ -117,6 +120,44 @@ Admin
   wagering value), 20 rows per page.
 * Both controllers are behind `AccessControl` (`roles => ['@']`); deletes are
   POST-only via `VerbFilter` and carry the CSRF token.
+
+Public site
+-----------
+
+Pretty URLs are on (`frontend/config/main.php`), so the public routes are
+paths. On PHP's built-in server they need the router script — see *Running*.
+
+| URL | page |
+|-----|------|
+| `/` | landing page: catalogue counts, type shortcuts, latest offers |
+| `/offers` | all live offers, filterable by type and casino, 20 per page |
+| `/offer/<slug>` | one offer with its bonus terms |
+| `/casino/<slug>` | one casino, its rating and its live offers |
+| `/sitemap.xml` | generated from the database |
+
+Every one of those pages starts from the same scope,
+`Offer::find()->publiclyVisible()` — published, not expired, and belonging to
+an active casino. A draft, an expired offer, one whose date has quietly lapsed
+and a slug that never existed all return the **same** 404 body, because a
+distinguishable one would let anyone enumerate unpublished offers.
+
+There is no login, signup or password reset on the public site, and that is
+deliberate: both applications share the `user` table and the backend authorises
+on `roles => ['@']`, so any active user is an administrator. Accounts come from
+`php yii seed/admin` only.
+
+### Sitemap
+
+`/sitemap.xml` is built by `frontend/components/Sitemap.php` from the same
+visibility scope, so it can never advertise a URL that 404s. It lists the home
+page, the offer listing, one entry per casino with something to show, and one
+per visible offer. Draft and expired offers never appear.
+
+`lastmod` is a W3C datetime: for an offer it is the later of `offer.updated_at`
+and its terms' `updated_at` (editing the terms changes the page), and for a
+casino the latest of its own row and every offer listed on it. The query is
+batched, so the document costs a bounded amount of memory however large the
+catalogue grows.
 
 N+1 check
 ---------

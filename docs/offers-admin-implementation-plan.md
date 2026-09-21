@@ -773,7 +773,7 @@ pageSize=100  queries=4
   (`SHOW FULL COLUMNS`, `SHOW CREATE TABLE`, key lookups) per table, which the
   schema cache serves afterwards; measure warm or the numbers mislead.
   A reviewer can reproduce it from the Yii Debug toolbar's **DB** panel once
-  Story 3.1 has seeded 30 offers; those numbers go into the README (Story 3.2).
+  Story 3.1 has seeded the demo catalogue; those numbers go into the README (Story 3.2).
 
 **Acceptance (as built):** `backend/tests/Functional/OfferFilterCest.php` (8
 cases) drives real requests: the list renders every offer;
@@ -798,22 +798,25 @@ Epic 3 — Seed data and documentation
 
 **Files:** create `console/controllers/SeedController.php`
 
-`php yii seed/offers` populates exactly 5 casinos and 30 offers with their terms,
+`php yii seed/offers` populates the demo catalogue — 6 casinos and 60 offers with
+their terms —
 deterministic and idempotent (a row whose slug already exists is skipped; the
 command reports how many were created). Distribution makes the filters and
 pagination visible:
 
-- 5 casinos, mixed `is_active`, ratings 3.8–4.7.
-- 30 offers — six per casino, so every type and status occurs: as built,
-  15 `welcome` / 10 `free_spins` / 5 `no_deposit`, and
-  20 `active` / 5 `draft` / 5 `expired`, with 20 publicly visible
-  (active and not expired) and 5 already lapsed.
+- 6 casinos, mixed `is_active`, ratings 3.8–4.7. The list lives in
+  `SeedController::casinoDefinitions()`; adding one adds its offers too.
+- `OFFERS_PER_CASINO` (10) offers per casino — 60 in total — so every type and
+  status occurs, and **both** grids paginate: 48 are active and unexpired, of
+  which 40 belong to active casinos and therefore reach the public list at 20
+  per page. Six expire inside the warning window, so the red "Ends in N days"
+  state is visible on the seeded data.
 - Terms coherent per type: `welcome` → `min_deposit` set, wagering 35–45;
   `no_deposit` → `min_deposit` null, `max_cashout` set, wagering 60;
   `free_spins` → `valid_days` set, wagering 25. Values straddle 35 so the
-  "max wagering" filter shows a difference. 20 of the 30 offers carry a terms
-  row; the other 10 (drafts and expired ones) have none, which exercises the
-  optional side of the relation.
+  "max wagering" filter shows a difference. 42 of the 60 offers carry a terms
+  row; the rest (drafts, expired ones and the loyalty no-deposit offer) have
+  none, which exercises the optional side of the relation.
 - Each pair is written through `Offer::saveWithTerms()` after
   `Model::validateMultiple()`, inside one outer transaction — the seed cannot
   drift from the validation rules, and a partial seed is impossible.
@@ -838,7 +841,7 @@ tests pin both halves (`testEmptyTermsAreValidEvenForAWelcomeOffer`,
 `testPartiallyFilledWelcomeTermsStillRequireTheMinimumDeposit`).
 
 **Acceptance (as built):** `php yii seed/offers` on an empty schema prints
-`5 casinos, 30 offers created.` / `Totals: 5 casinos, 30 offers, 20 terms
+`6 casinos, 60 offers created.` / `Totals: 6 casinos, 60 offers, 42 terms
 rows.`; a second run prints `0 casinos, 0 offers created.` with identical
 totals. Automated coverage lives in
 `common/tests/Unit/Console/SeedControllerTest.php` (8 cases): counts,
@@ -883,7 +886,7 @@ list and drags in those migrations, so the documented invocation is plain
 **Acceptance (as built):** the README's own commands were executed in order on
 a wiped database — `php yii migrate/fresh` (5 migrations),
 `php yii seed/admin` (user #1), `php yii seed/offers`
-(`5 casinos, 30 offers created.`), `php yii_test migrate`,
+(`6 casinos, 60 offers created.`), `php yii_test migrate`,
 `php vendor/bin/codecept build`, `php vendor/bin/codecept run --env php-builtin`
 → **OK (140 tests, 376 assertions)**, and
 `php vendor/bin/phpcs --standard=phpcs.xml.dist` → clean over 80 files.
@@ -965,7 +968,7 @@ After that, from a wiped database:
 |------|--------|
 | `php yii migrate/fresh` | 5 migrations applied |
 | `php yii seed/admin …` | `Created user #1 "admin".` |
-| `php yii seed/offers` | `5 casinos, 30 offers created.` / 20 terms rows |
+| `php yii seed/offers` | `5 casinos, 30 offers created.` / 20 terms rows (the catalogue later grew to 6 / 36 / 24) |
 | `php yii_test migrate` | up to date |
 | `php vendor/bin/codecept run --env php-builtin` | **OK (150 tests, 402 assertions)** |
 | `php vendor/bin/phpstan analyse` | no errors |
@@ -978,7 +981,8 @@ updated its rating to 4.8; created "Smoke Test Offer" against it as a
 confirmed `Min deposit (not set)` — the type-conditional rule holds through the
 real form; updated its status to Draft; deleted the offer and watched
 `offer_terms` drop 21 → 20, then deleted the casino and returned to exactly the
-seeded state (5 casinos, 30 offers, 20 terms). Filters, sorting and page 2 of
+seeded state (5 casinos, 30 offers, 20 terms — the catalogue has since grown
+to 6 / 36 / 24). Filters, sorting and page 2 of
 the grid were exercised in Stories 2.4 and 3.1.
 
 **Commit:** none (verification only); the compose fix commits under Story 4.2's
@@ -1048,6 +1052,7 @@ story sections above are kept in sync; this is the short list.
 | 2.3 offer CRUD | done | Plan's `Model::loadMultiple()` was wrong for two different models (it is a tabular-input helper); replaced with one `load()` per model plus `validateMultiple()`. `actionIndex()` ships a plain `ActiveDataProvider` until 2.4 replaces it. `findModel()` eager-loads casino and terms. |
 | 2.4 offer search | done | Three plan-level corrections: `joinWith()` must sit outside the filter branch (relational sorting is offered with no filter set); `Sort`/`Pagination` read request query params unless `'params' => $params` is passed, so the planned `search(['sort' => ...])` was silently ignored; `DataColumn` has no `sort` property, so the wagering sort key was renamed to match the filter attribute. Query count measured at 4, constant for `pageSize` 20 and 100 — count only `LEVEL_INFO` log records, each query logs three. |
 | 3.1 seed | done | Seeding real data exposed two rule collisions. A lapsed offer cannot be created (past `expires_at` is rejected), so those rows are inserted dateless and backdated with `updateAttributes()`. A `welcome` draft with no terms was rejected by the min-deposit rule, which now also requires `!isEmpty()` — no terms row, nothing to require. Test lives in the common suite: the console app has no Codeception suite here. |
+| 3.1 seed (revisited) | done | Catalogue grown to 6 casinos / 60 offers: added "Aurora Bay Casino" and four more offers per casino. The operator list moved into `SeedController::casinoDefinitions()` and the batch size into `OFFERS_PER_CASINO`, so the counts have one home and the tests derive totals from them. Raised deliberately past 20 twice over — 60 rows for the admin grid, 40 publicly visible — because below that neither pager ever appears. |
 | 3.2 README | done | Also widened `phpcs.xml.dist` to the directories added since the scaffold; migrations stay excluded (snake_case class names). Passing paths to `phpcs` overrides the ruleset's file list — the README documents the bare invocation. Whole README path re-run from a wiped database: 140 tests, 376 assertions green. |
 | 4.1 security pass | done | Audit found no injection or escaping holes. Checked the one latent risk explicitly: a `javascript:` URL reaching `terms_url` by another route is neutralised by Yii's `url` formatter, which prefixes unknown schemes. 10 assertions added, including bound-parameter and sort-whitelist proofs. |
 | 4.2 verification | done | The clean run earned its keep: `docker compose up -d` recreated the container and MySQL 8.4 aborted on `--default-authentication-plugin`, removed in 8.4. Fixed. Everything else green from a wiped database: 150 tests, 402 assertions, PHPStan and phpcs clean, manual CRUD smoke on both entities with the cascade verified. |
