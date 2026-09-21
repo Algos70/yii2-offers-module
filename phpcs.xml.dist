@@ -9,11 +9,17 @@
     <file>backend/assets</file>
     <file>backend/controllers</file>
     <file>backend/models</file>
+    <file>backend/tests/Functional</file>
+    <file>backend/tests/Unit</file>
     <file>backend/views</file>
+    <file>common/enums</file>
     <file>common/fixtures</file>
     <file>common/mail</file>
     <file>common/models</file>
+    <file>common/tests/Unit</file>
     <file>common/widgets</file>
+    <!-- console/migrations stays out: migration class names are snake_case by design -->
+    <file>console/controllers</file>
     <file>frontend/assets</file>
     <file>frontend/controllers</file>
     <file>frontend/models</file>    
