@@ -83,8 +83,16 @@ class OfferTerms extends ActiveRecord
             // A welcome bonus that states any terms at all must state its
             // minimum deposit. An offer with no terms yet (a draft being
             // sketched out) writes no row, so there is nothing to require.
-            [['min_deposit'], 'required', 'when' => static fn (self $model): bool
-                => $model->offerType === OfferType::Welcome->value && !$model->isEmpty()],
+            //
+            // `enableClientValidation` is off because `when` has no effect in the
+            // browser: Yii mirrors `required` into JS unconditionally unless a
+            // `whenClient` counterpart is given, which would put form-field ids
+            // into a shared model. Without this, saving *any* offer - including a
+            // no-deposit one with blank terms - was blocked client-side by
+            // "Min deposit cannot be blank." The server rule below is the real one.
+            [['min_deposit'], 'required', 'enableClientValidation' => false,
+                'when' => static fn (self $model): bool
+                    => $model->offerType === OfferType::Welcome->value && !$model->isEmpty()],
             // ... and a no-deposit offer must not carry one.
             [['min_deposit'], 'validateNotApplicable', 'when' => static fn (self $model): bool
                 => $model->offerType === OfferType::NoDeposit->value],

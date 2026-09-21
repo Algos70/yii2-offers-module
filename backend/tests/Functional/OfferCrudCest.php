@@ -102,6 +102,26 @@ final class OfferCrudCest
         $I->dontSeeRecord(Offer::class, ['title' => 'Incomplete Welcome']);
     }
 
+    /**
+     * The min-deposit rule is conditional, but Yii mirrors `required` into the
+     * page's client-side validators unconditionally unless it is told not to.
+     * With that mirror in place the browser refused to submit *any* offer whose
+     * min deposit was blank - including a no-deposit one - while this suite,
+     * which runs no JavaScript, stayed green. So assert on the emitted script.
+     */
+    public function theFormDoesNotDemandAMinimumDepositInTheBrowser(FunctionalTester $I): void
+    {
+        $this->login($I);
+
+        $I->amOnRoute('/offer/update', ['id' => 3]);   // a no-deposit offer
+        $I->dontSee('Min deposit cannot be blank.');   // no server-side error either
+        $I->assertStringNotContainsString(
+            'Min deposit cannot be blank.',
+            $I->grabPageSource(),
+            'the client validator must not require a min deposit on every offer',
+        );
+    }
+
     public function pastExpiryIsRejected(FunctionalTester $I): void
     {
         $this->login($I);
