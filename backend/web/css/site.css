@@ -212,21 +212,26 @@ a.desc:after {
     filter: invert(1);
 }
 
-/* dashboard welcome banner */
-.dashboard-banner {
-    background: linear-gradient(135deg, #83C933 0%, #3a9cbd 40%, #40B3D8 100%);
-    position: relative;
+/* dashboard stat cards */
+.dashboard-stat {
+    transition: transform .12s ease-in-out, box-shadow .12s ease-in-out;
 }
 
-.dashboard-banner::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    background:
-        radial-gradient(circle at 80% 80%, rgba(241, 138, 42, .25) 0%, transparent 50%),
-        radial-gradient(circle at 20% 20%, rgba(131, 201, 51, .2) 0%, transparent 40%);
-    pointer-events: none;
+.dashboard-stat:hover,
+.dashboard-stat:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: var(--bs-box-shadow) !important;
+}
+
+.dashboard-stat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 50%;
+    font-size: 1.15rem;
+    flex: none;
 }
 
 /* centered page layout: error */

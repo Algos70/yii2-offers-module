@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace backend\controllers;
 
+use backend\components\Dashboard;
 use common\models\LoginForm;
 use Yii;
 use yii\filters\AccessControl;
@@ -59,13 +60,13 @@ class SiteController extends Controller
     }
 
     /**
-     * Displays homepage.
-     *
-     * @return string
+     * Dashboard: catalogue counters plus the newest offers.
      */
     public function actionIndex(): string
     {
-        return $this->render('index');
+        return $this->render('index', [
+            'dashboard' => new Dashboard(),
+        ]);
     }
 
     /**
