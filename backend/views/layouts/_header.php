@@ -14,6 +14,16 @@ $items = [
         'url' => ['/site/index'],
     ],
     [
+        'label' => 'Casinos',
+        'url' => ['/casino/index'],
+        'visible' => !Yii::$app->user->isGuest,
+    ],
+    [
+        'label' => 'Offers',
+        'url' => ['/offer/index'],
+        'visible' => !Yii::$app->user->isGuest,
+    ],
+    [
         'label' => 'Login',
         'url' => ['/site/login'],
         'visible' => Yii::$app->user->isGuest,
