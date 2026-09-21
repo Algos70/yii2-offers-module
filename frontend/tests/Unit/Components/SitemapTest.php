@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace frontend\tests\Unit\Components;
 
 use Codeception\Test\Unit;
+use common\enums\OfferStatus;
 use common\fixtures\CasinoFixture;
 use common\fixtures\OfferFixture;
 use common\fixtures\OfferTermsFixture;
@@ -55,6 +56,27 @@ final class SitemapTest extends Unit
         $all = implode(' ', $this->locations());
 
         self::assertStringNotContainsString('fixture-casino-two', $all);
+    }
+
+    /**
+     * An active casino with nothing published still has a page — it renders
+     * "No live offers right now" — so leaving it out would hide a live URL
+     * from crawlers. Only inactive casinos are omitted, because only they 404.
+     */
+    public function testActiveCasinosWithoutVisibleOffersAreStillListed(): void
+    {
+        // Hide both of casino 1's offers, leaving it with nothing to show.
+        Offer::updateAll(['status' => OfferStatus::Draft->value], ['casino_id' => 1]);
+
+        $all = implode(' ', $this->locations());
+
+        self::assertStringContainsString(
+            '/casino/fixture-casino-one',
+            $all,
+            'an active casino must be listed even with no live offers',
+        );
+        // ... while its now-hidden offers are gone.
+        self::assertStringNotContainsString('visible-welcome-bonus', $all);
     }
 
     public function testEveryEntryCarriesAW3cLastmod(): void

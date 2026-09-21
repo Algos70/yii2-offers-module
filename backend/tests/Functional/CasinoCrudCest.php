@@ -48,6 +48,20 @@ final class CasinoCrudCest
         $I->dontSee('Fixture Casino One');
     }
 
+    /**
+     * The same trap as the offer title search: `CasinoSearch` inherited
+     * `SluggableBehavior`, which turned the name box into a slug condition and
+     * made an exact name match return nothing.
+     */
+    public function filterMatchesAnExactName(FunctionalTester $I): void
+    {
+        $this->login($I);
+
+        $I->amOnRoute('/casino/index', ['CasinoSearch' => ['name' => 'Fixture Casino One']]);
+        $I->see('Fixture Casino One');
+        $I->see('Showing 1-1 of 1 item.');
+    }
+
     public function createDerivesTheSlug(FunctionalTester $I): void
     {
         $this->login($I);

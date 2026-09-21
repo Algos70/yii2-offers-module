@@ -69,6 +69,30 @@ final class OfferSearchTest extends Unit
         self::assertSame([1, 2], $this->ids($models));
     }
 
+    /**
+     * Searching for a title that exists verbatim used to return nothing.
+     *
+     * `OfferSearch extends Offer`, so it inherited `SluggableBehavior`, which
+     * runs on `beforeValidate` — triggered by `search()` — and slugified the
+     * search box into `$this->slug`. `andFilterWhere()` then added that as a
+     * second condition, and because `ensureUnique` saw the slug already taken
+     * it appended `-2`, so the query asked for `slug LIKE '%…-2%'`.
+     */
+    public function testTitleSearchDoesNotInventASlugCondition(): void
+    {
+        $search = new OfferSearch();
+
+        $models = $search->search(['OfferSearch' => ['title' => 'Visible Welcome Bonus']])->getModels();
+
+        self::assertEmpty($search->getAttribute('slug'), 'nothing may write to slug during a search');
+        self::assertSame([1], $this->ids($models));
+    }
+
+    public function testSearchModelHasNoPersistenceBehaviors(): void
+    {
+        self::assertSame([], (new OfferSearch())->behaviors());
+    }
+
     public function testFilterByMaxWageringUsesTheRelatedTable(): void
     {
         // Fixtures: offer 1 has 35.0, offer 2 has 45.0, the rest have no terms.

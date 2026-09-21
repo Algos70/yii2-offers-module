@@ -18,6 +18,16 @@ class CasinoSearch extends Casino
 {
     public const PAGE_SIZE = 20;
 
+    /**
+     * None: this model filters, it never persists. `Casino`'s
+     * `SluggableBehavior` would otherwise slugify the name box into `$this->slug`
+     * during validation and filter on it as well.
+     */
+    public function behaviors(): array
+    {
+        return [];
+    }
+
     public function rules(): array
     {
         return [

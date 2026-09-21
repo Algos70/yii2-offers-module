@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace frontend\components;
 
+use common\models\Casino;
 use common\models\Offer;
 use yii\helpers\Url;
 
@@ -31,12 +32,12 @@ final class Sitemap
     public function urls(): array
     {
         $offers = [];
-        /** @var array<int, array{name: string, slug: string, lastmod: int}> $casinos */
-        $casinos = [];
+        /** @var array<int, int> $offerDates casino id => newest offer lastmod */
+        $offerDates = [];
         $newest = 0;
 
-        // One pass builds both lists: every visible offer is an entry of its
-        // own and also dates its casino's page.
+        // Every visible offer is an entry of its own, and also dates the casino
+        // page that lists it.
         foreach (Offer::find()->publiclyVisible()->withTerms()->each(self::BATCH_SIZE) as $offer) {
             /** @var Offer $offer */
             $lastmod = $this->offerLastmod($offer);
@@ -48,13 +49,7 @@ final class Sitemap
                 'changefreq' => 'weekly',
             ];
 
-            $casino = $offer->casino;
-            $casinoLastmod = max((int) $casino->updated_at, $lastmod);
-
-            $casinos[$casino->id] = [
-                'loc' => Url::to((new CasinoPresenter($casino))->url(), true),
-                'lastmod' => max($casinos[$casino->id]['lastmod'] ?? 0, $casinoLastmod),
-            ];
+            $offerDates[$offer->casino_id] = max($offerDates[$offer->casino_id] ?? 0, $lastmod);
         }
 
         // With nothing published, the index pages still exist; their date is
@@ -79,10 +74,16 @@ final class Sitemap
             ],
         ];
 
-        foreach ($casinos as $casino) {
+        // Driven by the casino table, not by the offers: an active casino with
+        // nothing published still has a page — it says so — and leaving it out
+        // would hide a live URL from crawlers. Only inactive casinos are
+        // omitted, because only they 404.
+        foreach (Casino::find()->where(['is_active' => true])->orderBy(['name' => SORT_ASC])
+            ->each(self::BATCH_SIZE) as $casino) {
+            /** @var Casino $casino */
             $urls[] = [
-                'loc' => $casino['loc'],
-                'lastmod' => $this->format($casino['lastmod']),
+                'loc' => Url::to((new CasinoPresenter($casino))->url(), true),
+                'lastmod' => $this->format(max((int) $casino->updated_at, $offerDates[$casino->id] ?? 0)),
                 'changefreq' => 'weekly',
             ];
         }

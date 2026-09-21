@@ -25,6 +25,21 @@ class OfferSearch extends Offer
      */
     public ?string $maxWagering = null;
 
+    /**
+     * None: this model filters, it never persists.
+     *
+     * Inheriting `Offer`'s behaviors is actively harmful here. `SluggableBehavior`
+     * runs on `beforeValidate`, which `search()` triggers, and slugifies whatever
+     * was typed into the title box straight into `$this->slug` — where
+     * `andFilterWhere()` then picks it up as a second, invented condition. With
+     * `ensureUnique` it is worse still: searching for an existing title produced
+     * `slug LIKE '%…-2%'` and therefore no rows at all.
+     */
+    public function behaviors(): array
+    {
+        return [];
+    }
+
     public function rules(): array
     {
         return [
