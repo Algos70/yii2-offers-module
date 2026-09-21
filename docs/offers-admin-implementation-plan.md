@@ -520,10 +520,31 @@ Run: `php vendor/bin/codecept run backend/tests`.
   `andFilterWhere(['like', 'name', $this->name])` and exact matches elsewhere.
 - Delete confirmation states the offer count (`$model->getOffers()->count()` —
   one aggregate query, no hydration) because the FK cascades.
+- `actionCreate()` instantiates `new Casino(['is_active' => true])`. Found by
+  the browser smoke test: the model's `default` rule only fires during
+  validation, so an untouched create form rendered the checkbox unchecked and
+  `ActiveForm`'s hidden input posted `0` — a new casino silently arrived
+  inactive. Pinned by an `is_active => 1` assertion in the create test.
 
-**Acceptance (logged in):** creating a casino with a blank slug derives the slug
-and flashes success; `rating = 9` redisplays the form with an error and creates
-nothing; sorting by `name` toggles; `delete` over GET is rejected.
+**Acceptance (as built):** `backend/tests/Functional/CasinoCrudCest.php`, 9
+cases: a guest hitting `index|create|view|update` lands on `site/login` (the
+gate check inherited from Story 2.1); the grid lists both fixture casinos;
+`CasinoSearch[name]=Two` narrows it; create with a blank slug derives
+`neon-nights`, flashes and stores `is_active = 1`; `rating = 9` redisplays the
+form with "must be no greater than 5" and stores nothing; update persists;
+`delete` over GET returns **405**; `delete` over POST **without** a CSRF token
+returns **400** and keeps the row; `delete` over POST **with** the token from
+the page's `csrf-token` meta tag removes it.
+Run: `php vendor/bin/codecept run backend/tests`.
+
+**Browser smoke (real UI, backend on :8081):** login → `/casino/index` lists
+the three dev casinos; create form stores `browser-smoke-casino` with the slug
+derived; `rating = 9` shows the inline error; `sort=-rating` reorders;
+`CasinoSearch[name]=Neon` filters to one row; the create checkbox is
+pre-checked and the stored record reads "Active: Yes".
+Not covered in the browser: the delete link's `data-method="post"` +
+`data-confirm` round trip — the relay-driven tab cannot resolve the native
+`confirm()` dialog. That path is covered by the three delete tests above.
 
 **Commit:** `feat(backend): add casino CRUD`
 
@@ -870,6 +891,7 @@ story sections above are kept in sync; this is the short list.
 | 1.6 Offer + OfferQuery | done | Expiry split into two validators; `notExpired()` binds a PHP timestamp instead of MySQL `NOW()`; `getTerms()`, `withTerms()` and `saveWithTerms()` moved to 1.7. |
 | 1.7 OfferTerms | done | Picked up the three deferred pieces. `saveWithTerms()` grew an explicit lifecycle for the optional row: skip when empty, delete when blanked, repopulate the relation after commit. Rollback proven against the DB check constraint, not a mock. |
 | 2.1 nav + gate | done | Nav only; the 302 gate check belongs to the controllers and moved to 2.2/2.3. Covered by `NavigationCest` (guest vs. signed in). |
+| 2.2 casino CRUD | done | `is_active` default had to be set on the create form, not just in `rules()`. Domain fixtures gained `$dataFile = '@common/tests/Support/data/...'` defaults, because `codecept_data_dir()` resolves per suite and the backend suite could not see `common/`'s data files. CSRF rejection (400) turned into its own assertion rather than a test failure. |
 
 **Rule adopted from 1.5 onward:** a story may not ship code that fails
 `php vendor/bin/phpstan analyse`. Forward references to classes a later story
